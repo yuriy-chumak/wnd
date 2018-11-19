@@ -99,13 +99,27 @@
                   (frame (floor (/ (* ssms frames) duration))))
                (mail sender (+ (get itself 'fg 0) position (mod frame frames) (get orientations orientation 0))))
             (this itself))
-         ; 
+         ;
 
          (else
+         ;  (print "maybe game event? " (ref msg 1))
             ; игровое событие?
             (define event (getf itself (ref msg 1)))
-            (unless event (print-to stderr "Unknown command " msg))
+         ;  (print "event: " event)
+            (unless event (print-to stderr "Unknown command " msg)) ; error
             (if event
                (this (event itself))
                (this itself)))))))))
+
+(define (creature:move itself xy)
+   (let*((location (get itself 'location '(0 . 0)))
+         (itself (put itself 'location (cons (+ (car location) (car xy)) (+ (cdr location) (cdr xy)))))
+         (orientation (cond
+            ((equal? xy '(-1 . 0)) 6)
+            ((equal? xy '(0 . -1)) 0)
+            ((equal? xy '(+1 . 0)) 2)
+            ((equal? xy '(0 . +1)) 4)
+            (else (get itself 'orientation 0))))
+         (itself (put itself 'orientation orientation)))
+      itself))
 

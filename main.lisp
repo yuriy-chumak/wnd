@@ -8,6 +8,8 @@
 (import (OpenGL version-2-1))
 (print "---------------")
 (gl:set-window-title "Drawing the tiled map")
+(gl:set-window-size 854 480) (glViewport 0 0 854 480)
+
 ;(gl:set-window-size 1920 960)
 ;(glViewport 0 0 1920 960)
 
@@ -101,7 +103,7 @@
 
 ; loading animations
 (define skeleton-animation (list->ff (ini-parse-file "skeleton.ini")))
-(define antlion-animation (list->ff (ini-parse-file "antlion.ini")))
+;(define antlion-animation (list->ff (ini-parse-file "antlion.ini")))
 
 
 ;; ; find first skeleton id
@@ -112,7 +114,31 @@
 ;; (define hero_pos (cons
 ;;    (string->number (car hero_pos) 10)
 ;;    (string->number (cadr hero_pos) 10)))
-(define hero_pos (cons 51 61)) ; TODO: move to level
+;; (define hero_pos (cons 51 61)) ; TODO: move to level
+
+
+; -=( hero )=---------
+(define hero-destination '(51 . 61)) ; точка, куда надо идти герою
+
+(make-creature 'hero) (mail 'creatures (tuple 'set 'hero 'hero))
+(mail 'hero (tuple 'set-location '(51 . 61)))
+
+(define zombie-animation (list->ff (ini-parse-file "zombie.ini")))
+(mail 'hero (tuple 'set-animations zombie-animation 860)) ; zombie 'firstgid'
+(mail 'hero (tuple 'set-current-animation 'run))
+
+(mail 'hero (tuple 'set 'idle (lambda (itself)
+   (define location (getf itself 'location))
+   ;(print "location: " location)
+   ;(print "hero-destination: " hero-destination)
+   (let ((move (A* collision-data
+                  (car location) (cdr location)
+                  (car hero-destination) (cdr hero-destination))))
+      ;(print "move: " move)
+      (if move
+         (creature:move itself (cons (ref move 1) (ref move 2)))
+         itself)))))
+
 
 ; TEMP
 ;; ; spawn skeleton
@@ -156,6 +182,7 @@
                (car location) (cdr location)
                (car chest) (cdr chest)))
          (define move (cons (ref _move 1) (ref _move 2)))
+         (print "move: " move)
 
          ; move relative:
          ; todo: set as internal function(event or command)
@@ -169,9 +196,6 @@
                (itself (put itself 'orientation orientation)))
             itself)))))
    skeletons)
-
-
-
 
 ; а давайте-ка пометим на карту сундук? вместо героя
 ; и пускай этот сундук сразу телепортируется в новое место,
@@ -231,7 +255,7 @@
 (gl:set-renderer (lambda ()
    ; thinking!
    (let*((ss ms (clock))
-         (i (mod (floor (/ (+ (* ss 1000) ms) (/ 1000 8))) 8)))
+         (i (mod (floor (/ (+ (* ss 1000) ms) (/ 1000 4))) 4)))
 
       (unless (eq? i (unbox timestamp))
          (begin
@@ -242,6 +266,8 @@
             (for-each (lambda (id)
                   (mail id (tuple 'think)))
                skeletons)
+            ; и герою тоже пошлем сообщение
+            (mail 'hero (tuple 'idle))
 
             ;; ; maybe move chest
             ;; (for-each (lambda (id)
@@ -264,9 +290,9 @@
    (interact 'creatures (tuple 'ready?))
 
    ; drawing
-   (glClear GL_COLOR_BUFFER_BIT) ;(vm:or GL_COLOR_BUFFER_BIT GL_DEPTH_BUFFER_BIT))
+   (glClear GL_COLOR_BUFFER_BIT)
    (glLoadIdentity)
-   (glOrtho (ref window 1) (ref window 3) (ref window 4) (ref window 2) -1 1) ; invert axis Y on screen
+   (glOrtho (ref window 1) (ref window 3) (ref window 4) (ref window 2) -1 1) ; invert axis Y on screen!
 
    ; попросим уровень отрисовать себя
    (interact 'level (tuple 'draw)) ; (level:draw)
@@ -285,6 +311,19 @@
    #null))
 
 
+; --------------------------------------------
+;; (define (unX x y tw th)
+;;    (+ (- (* x (/ w 2))
+;;          (* y (/ w 2)))
+;;       (- (/ (* width w) 4) (/ w 2))))
+
+;; (define (unY x y tw th)
+;;    (+ (+ (* x (/ h 2))
+;;          (* y (/ h 2)))
+;;       (- h th)))
+; --------------------------------------------
+
+
 ; keyboard
 ; обработчик событий клавиатуры
 ;  внимание, это "события", а не "состояние"!!!
@@ -295,5 +334,9 @@
 
 (gl:set-mouse-handler (lambda (button x y)
    (print "mouse: " button " (" x ", " y ")")
-   #true
-))
+
+   (if (eq? button 1) (begin
+      ; let's calculate clicked tile: TBD.
+
+      #true))
+   #true))

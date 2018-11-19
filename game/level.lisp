@@ -14,14 +14,14 @@
 
 ; игровой уровень
 (fork-server 'level (lambda ()
-   
-   
-   
-   
-   
-   
-   
-   
+
+
+
+
+
+
+
+
    ; this
    (let this ((itself #empty))
       (let*((envelope (wait-mail))
@@ -161,15 +161,14 @@
                   (object-data . ,object-data)
                   (collision . ,collision-data)))))
 
-            ((draw)
+            ((draw); interact
                (let ((w (getf itself 'tilewidth))
                      (h (getf itself 'tileheight))
                      (width (getf itself 'width))
                      (height (getf itself 'height))
                      (tileset (getf itself 'tileset))
                      (background-data (getf itself 'background-data))
-                     (object-data (getf itself 'object-data))
-                     )
+                     (object-data (getf itself 'object-data)))
 
                   (define (X x y tw th)
                      (+ (- (* x (/ w 2))
@@ -241,12 +240,15 @@
 
                   (draw-layer object-data (append creatures (list
                      ; (tuple destination 552) ; временно - сундук
+                     (tuple (interact 'chest (tuple 'get-location)) 552)
                      ; хорошо бы сюда еще игрока добавить... но его рисовать сложнее, так что пока отложим
+                     ; временно пусть это будет зомби ))
+                     (tuple (interact 'hero (tuple 'get-location)) (interact 'hero (tuple 'get-animation-frame)))
                   )))
 
 
                   ; coordinates
-                  ;#|
+                  #|
                   (glDisable GL_TEXTURE_2D)
                   (glEnable GL_LINE_STIPPLE)
                   (glLineStipple 2 #xAAAA)
@@ -271,7 +273,7 @@
                   (mail sender 'ok)
                   (this itself)))
 
-            ; 
+            ;
             (else
                (print-to stderr "Unknown world command: " msg)
                (this itself)))))))
