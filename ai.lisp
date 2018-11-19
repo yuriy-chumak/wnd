@@ -1,5 +1,7 @@
 #!/usr/bin/ol
 
+; алгоритм поиска пути
+; level: list of lists, collision сетка игровоuj уровня. все, что не 0 непроходимо
 (define (A* level from-x from-y to-x to-y)
    (let ((xy (cons from-x from-y))
 

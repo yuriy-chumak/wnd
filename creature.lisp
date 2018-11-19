@@ -102,6 +102,10 @@
          ; 
 
          (else
-            (print-to stderr "Unknown command " msg)
-            (this itself))))))))
+            ; игровое событие?
+            (define event (getf itself (ref msg 1)))
+            (unless event (print-to stderr "Unknown command " msg))
+            (if event
+               (this (event itself))
+               (this itself)))))))))
 
