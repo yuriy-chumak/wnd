@@ -1,5 +1,9 @@
 #!/usr/bin/ol
 
+; игра пошаговая! посему все ходы только после клика "я готов" (пока это ПКМ) и все НПС
+; должны ходить по-очереди. при этом демонстрировать что они делают.
+
+
 ; -=( main )=------------------------------------
 ; подключаем графические библиотеки, создаем окно
 (import (lib gl))
@@ -8,7 +12,7 @@
 (import (OpenGL version-2-1))
 (print "---------------")
 (gl:set-window-title "Drawing the tiled map")
-(gl:set-window-size 854 480) (glViewport 0 0 854 480)
+(gl:set-window-size 427 240) (glViewport 0 0 427 240)
 
 ;(gl:set-window-size 1920 960)
 ;(glViewport 0 0 1920 960)
@@ -40,6 +44,7 @@
 
 (define split-by-comma (string->regex "c/,/"))
 (define split-by-newline (string->regex "c/\n/"))
+(define (time-ms) (let*((ss ms (clock))) (+ (* ss 1000) ms)))
 
 
 ; load level
@@ -102,7 +107,6 @@
 
 
 ; loading animations
-(define skeleton-animation (list->ff (ini-parse-file "skeleton.ini")))
 ;(define antlion-animation (list->ff (ini-parse-file "antlion.ini")))
 
 
@@ -120,24 +124,24 @@
 ; -=( hero )=---------
 (define hero-destination '(51 . 61)) ; точка, куда надо идти герою
 
-(make-creature 'hero) (mail 'creatures (tuple 'set 'hero 'hero))
+(make-creature 'hero #empty) (mail 'creatures (tuple 'set 'hero 'hero))
 (mail 'hero (tuple 'set-location '(51 . 61)))
 
 (define zombie-animation (list->ff (ini-parse-file "zombie.ini")))
 (mail 'hero (tuple 'set-animations zombie-animation 860)) ; zombie 'firstgid'
-(mail 'hero (tuple 'set-current-animation 'run))
+;не, не будем задавать никакую текущую анимацию персонажу. ;(interact 'hero (tuple 'set-current-animation 'run))
 
-(mail 'hero (tuple 'set 'idle (lambda (itself)
-   (define location (getf itself 'location))
-   ;(print "location: " location)
-   ;(print "hero-destination: " hero-destination)
-   (let ((move (A* collision-data
-                  (car location) (cdr location)
-                  (car hero-destination) (cdr hero-destination))))
-      ;(print "move: " move)
-      (if move
-         (creature:move itself (cons (ref move 1) (ref move 2)))
-         itself)))))
+;; (mail 'hero (tuple 'set 'idle (lambda (itself)
+;;    (define location (getf itself 'location))
+;;    ;(print "location: " location)
+;;    ;(print "hero-destination: " hero-destination)
+;;    (let ((move (A* collision-data
+;;                   (car location) (cdr location)
+;;                   (car hero-destination) (cdr hero-destination))))
+;;       ;(print "move: " move)
+;;       (if move
+;;          (creature:move itself (cons (ref move 1) (ref move 2)))
+;;          itself)))))
 
 
 ; TEMP
@@ -152,55 +156,47 @@
 ;; (define skeleton (filter (lambda (tag) (string-eq? (xml-get-attribute tag 'name "") "skeleton")) tilesets))
 ;; (define firstgid (string->number (xml-get-attribute (car skeleton) 'firstgid 0) 10))
 
-(define firstgid 296) ; TODO: move to level
-(define skeletons (map (lambda (id)
-      (make-creature id)
-      (mail id (tuple 'set-animations skeleton-animation firstgid))
-      id)
-   (iota 6 1000)))
+; -=( skeletons )=-----------------
+,load "skeleton.lisp" ; стейт-машина скелета, в этом файле записано его поведение
+(define skeleton-animation (list->ff (ini-parse-file "skeleton.ini")))
 
-; let skeletons random on map
+(define skeletons (iota 1 1000)) ; 6 скелетонов, начиная с номера 1000 (пускай скелетоны будут номерные)
 (for-each (lambda (id)
+      (make-creature id #empty)) ; создаем их
+   skeletons)
+(mail 'creatures (tuple 'set 'skeletons skeletons)) ; и сохраним в списке всех npc
+
+; теперь поместим скелетонов в случайные места на карте
+(for-each (lambda (id)
+      ; поиск свободного места
       (let loop ()
          (let ((x (rand! 64))
                (y (rand! 64)))
             (if (eq? 0 (at x y))
                (mail id (tuple 'set-location (cons x y)))
                (loop))))
-      (mail id (tuple 'set-current-animation 'run)))
+      (mail id (tuple 'set-current-animation 'stance)))
    skeletons)
 
-(mail 'creatures (tuple 'set 'skeletons skeletons))
+; зададим скелетонам машину состояний и пусть все пока спят
 (for-each (lambda (id)
-      ; научим скелетов ходить и искать сундук
-      (mail id (tuple 'set 'think (lambda (itself)
-         ; let's find a chest and do a step to it
-         (define location (getf itself 'location))
-         (define chest (interact 'chest (tuple 'get-location)))
-         (define _move
-            (A* collision-data
-               (car location) (cdr location)
-               (car chest) (cdr chest)))
-         (define move (cons (ref _move 1) (ref _move 2)))
-         (print "move: " move)
+      (mail id (tuple 'set 'state-machine skeleton-state-machine))) ; state machine
+   skeletons)
+; set initial state
+(for-each (lambda (id)
+      (mail id (tuple 'set 'state 'sleeping))) ; initial state
+   skeletons)
 
-         ; move relative:
-         ; todo: set as internal function(event or command)
-         (let*((itself (put itself 'location (cons (+ (car location) (car move)) (+ (cdr location) (cdr move)))))
-               (orientation (cond
-                  ((equal? move '(-1 . 0)) 6)
-                  ((equal? move '(0 . -1)) 0)
-                  ((equal? move '(+1 . 0)) 2)
-                  ((equal? move '(0 . +1)) 4)
-                  (else (get itself 'orientation 0))))
-               (itself (put itself 'orientation orientation)))
-            itself)))))
+
+(define firstgid 296) ; TODO: move to level
+(for-each (lambda (id)
+      (mail id (tuple 'set-animations skeleton-animation firstgid)))
    skeletons)
 
 ; а давайте-ка пометим на карту сундук? вместо героя
 ; и пускай этот сундук сразу телепортируется в новое место,
 ; как только его кто-то нашел?
-(make-creature 'chest)
+(make-creature 'chest #empty)
 
 (let loop ()
    (let ((x (rand! 64))
@@ -234,8 +230,7 @@
       (set-ref! window 2 (- y h))
       (set-ref! window 3 (+ x w))
       (set-ref! window 4 (+ y h))))
-(define (move dx dy)
-   (let*((x (floor (* (- (ref window 3) (ref window 1)) 0.01)))
+(define (move dx dy)(let*((x (floor (* (- (ref window 3) (ref window 1)) 0.01)))
          (y (floor (* (- (ref window 4) (ref window 2)) 0.01))))
       (set-ref! window 1 (+ (ref window 1) (* dx x)))
       (set-ref! window 2 (- (ref window 2) (* dy y)))
@@ -253,41 +248,42 @@
 (define timestamp (box 0))
 ; draw
 (gl:set-renderer (lambda ()
-   ; thinking!
    (let*((ss ms (clock))
          (i (mod (floor (/ (+ (* ss 1000) ms) (/ 1000 4))) 4)))
 
       (unless (eq? i (unbox timestamp))
+         ; прежде чем нарисовать картинку надо всем NPC обдумать и сделать свои ходы
          (begin
             (set-car! timestamp i)
 
-            ; события нипов пускай остаются асинхронными,
-            ; просто перед рисованием убедимся что они все закончили свою работу
-            (for-each (lambda (id)
-                  (mail id (tuple 'think)))
-               skeletons)
-            ; и герою тоже пошлем сообщение
-            (mail 'hero (tuple 'idle))
-
-            ;; ; maybe move chest
+            ;; ; события нипов пускай остаются асинхронными,
+            ;; ; просто перед рисованием убедимся что они все закончили свою работу
             ;; (for-each (lambda (id)
-            ;;       (define pos (interact id (tuple 'get-location)))
-
-            ;;       (if (equal? pos destination)
-            ;;          (let loop ()
-            ;;             (let ((x (rand! 64))
-            ;;                   (y (rand! 64)))
-            ;;                (if (eq? 0 (at x y))
-            ;;                   (begin
-            ;;                      (set-car! destination x)
-            ;;                      (set-cdr! destination y))
-            ;;                   (loop))))))
-            ;;    skeletons)
-
+            ;;       (mail id (tuple 'process-event-transition-tick)))
+            ;;    (interact 'creatures (tuple 'get 'skeletons)))
          )))
 
-   ; убедимся, что все npc готоры к отображению
-   (interact 'creatures (tuple 'ready?))
+      ;;       ; и герою тоже пошлем сообщение
+      ;;       ;(mail 'hero (tuple 'idle))
+
+      ;;       ;; ; maybe move chest
+      ;;       ;; (for-each (lambda (id)
+      ;;       ;;       (define pos (interact id (tuple 'get-location)))
+
+      ;;       ;;       (if (equal? pos destination)
+      ;;       ;;          (let loop ()
+      ;;       ;;             (let ((x (rand! 64))
+      ;;       ;;                   (y (rand! 64)))
+      ;;       ;;                (if (eq? 0 (at x y))
+      ;;       ;;                   (begin
+      ;;       ;;                      (set-car! destination x)
+      ;;       ;;                      (set-cdr! destination y))
+      ;;       ;;                   (loop))))))
+      ;;       ;;    skeletons)
+      ;;    )))
+
+   ; убедимся, что ВСЕ npc готовы к отображению
+   ;(interact 'creatures (tuple 'ready?))
 
    ; drawing
    (glClear GL_COLOR_BUFFER_BIT)
@@ -332,11 +328,60 @@
    (case key
       (#x18 (shutdown 1))))) ; q - quit
 
+(define calculating-world (box 0))
+
 (gl:set-mouse-handler (lambda (button x y)
    (print "mouse: " button " (" x ", " y ")")
+   (cond
+      ((eq? button 1)
+         ; let's calculate clicked tile: TBD.
 
-   (if (eq? button 1) (begin
-      ; let's calculate clicked tile: TBD.
+         #true)
+      ((eq? button 3) ; ПКМ
+         (if (eq? (unbox calculating-world) 0) ; если мир сейчас не просчитывается (todo: оформить отдельной функцией)
+            (begin
+               (set-car! calculating-world 42)
+               (mail 'game (tuple 'turn)))))
+      (else
+         ; nothing
+         #true))
+   ))
 
-      #true))
-   #true))
+(fork-server 'game (lambda ()
+   (let this ((itself #empty))
+   (let*((envelope (wait-mail))
+         (sender msg envelope))
+      (tuple-case msg
+         ((turn)
+            ; 1. Каждому надо выдать некотрое количество action-points (сколько действий он может выполнить за ход)
+            ;  это, конечно же, зависит от npc - у каждого может быть разное
+            ; TBD.
+
+            ; 2. Отсортировать всех по уровню инициативности, то есть кто имеет право ударить первым
+            ;  это тоже зависит от npc
+
+            ; 3. И только теперь подергать каждого - пусть походит
+            ;  причем следующего можно дергать только после того, как отработают все запланированные анимации хода
+            (for-each (lambda (creature)
+                  ; для тестов - пусть каждый скелет получает урон "-50"
+                  (let ((state (interact creature (tuple 'get 'state)))
+                        (state-machine (or (interact creature (tuple 'get 'state-machine)) #empty)))
+                     (print "state: " state)
+                     (print "state-machine: " state-machine)
+                  (let*((state (get state-machine state #empty))
+                        (handler (getf state 'damage))) ; 'damage - нанести урон
+                     (print "tick: " (getf state 'tick))
+                     (print "handler: " handler)
+                     (let ((state (handler creature 50)))
+                        (print "new-state: " state)
+                        (if state (mail creature (tuple 'set 'state state))))
+                     (print "ok."))))
+               (interact 'creatures (tuple 'get 'skeletons)))
+            (print "turn done.")
+
+            ; вроде все обработали, можно переходить в состояние "готов к следующему ходу"
+            (set-car! calculating-world 0)
+            (this itself))
+         (else
+            (print "logic: unhandled event: " msg)
+            (this itself)))))))

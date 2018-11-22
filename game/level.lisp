@@ -243,32 +243,8 @@
                      (tuple (interact 'chest (tuple 'get-location)) 552)
                      ; хорошо бы сюда еще игрока добавить... но его рисовать сложнее, так что пока отложим
                      ; временно пусть это будет зомби ))
-                     (tuple (interact 'hero (tuple 'get-location)) (interact 'hero (tuple 'get-animation-frame)))
+                     ;(tuple (interact 'hero (tuple 'get-location)) (interact 'hero (tuple 'get-animation-frame)))
                   )))
-
-
-                  ; coordinates
-                  #|
-                  (glDisable GL_TEXTURE_2D)
-                  (glEnable GL_LINE_STIPPLE)
-                  (glLineStipple 2 #xAAAA)
-                  (glBegin GL_LINES)
-                     (glColor3f 1 0 0)
-                     (glVertex2f -4096 0)
-                     (glVertex2f +4096 0)
-                     (glColor3f 1 0 1)
-                     (glVertex2f -4096 1024)
-                     (glVertex2f +4096 1024)
-                     (glColor3f 0 1 0)
-                     (glVertex2f 0 -4096)
-                     (glVertex2f 0 +4096)
-                     (glColor3f 0 1 1)
-                     (glVertex2f 1024 -4096)
-                     (glVertex2f 1024 +4096)
-                  (glEnd)
-                  (glDisable GL_LINE_STIPPLE)
-                  ;|#
-
 
                   (mail sender 'ok)
                   (this itself)))
