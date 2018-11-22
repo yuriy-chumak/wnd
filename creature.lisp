@@ -1,6 +1,7 @@
 (import (file ini))
 (import (scheme misc))
 
+
 ; servers with numbers - creatures!
 ;; (fork-server 'creatures (lambda ()
 ;; (let this ((id 1) (itself #empty))
@@ -71,6 +72,7 @@
                   (mail sender (if animation-info (getf animation-info 'duration))))
                (this itself)))
          ((get-animation-frame)
+            ; todo: change frames count according to animation type (and fix according math)
             (let*((animation (get itself 'animation 'stance)) ; соответствующая состояния анимация
                   (ssms (- (time-ms) (get itself 'ssms 0))) ; количество ms с момента перехода в анимацию
                   (animations (get itself 'animations #empty))

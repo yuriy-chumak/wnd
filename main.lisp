@@ -1,8 +1,8 @@
 #!/usr/bin/ol
-
 ; игра пошаговая! посему все ходы только после клика "я готов" (пока это ПКМ) и все НПС
 ; должны ходить по-очереди. при этом демонстрировать что они делают.
-
+(define screen-width 1920)
+(define screen-height 1080)
 
 ; -=( main )=------------------------------------
 ; подключаем графические библиотеки, создаем окно
@@ -12,7 +12,7 @@
 (import (OpenGL version-2-1))
 (print "---------------")
 (gl:set-window-title "Drawing the tiled map")
-(gl:set-window-size 427 240) (glViewport 0 0 427 240)
+(gl:set-window-size screen-width screen-height) (glViewport 0 0 screen-width screen-height)
 
 ;(gl:set-window-size 1920 960)
 ;(glViewport 0 0 1920 960)
@@ -160,7 +160,7 @@
 ,load "skeleton.lisp" ; стейт-машина скелета, в этом файле записано его поведение
 (define skeleton-animation (list->ff (ini-parse-file "skeleton.ini")))
 
-(define skeletons (iota 1 1000)) ; 6 скелетонов, начиная с номера 1000 (пускай скелетоны будут номерные)
+(define skeletons (iota 10 1000)) ; 6 скелетонов, начиная с номера 1000 (пускай скелетоны будут номерные)
 (for-each (lambda (id)
       (make-creature id #empty)) ; создаем их
    skeletons)
@@ -220,6 +220,7 @@
 ; --------------------------------------------------------------------
 ; view window
 
+;              x-left             x-right y-left         y-right
 (define window (vector (+ -32 -800) -32 (+ 3645 32 -800) (+ 2048 32)))
 (define (resize scale)
    (let*((x (floor (/ (+ (ref window 3) (ref window 1)) 2)))
@@ -334,7 +335,14 @@
    (print "mouse: " button " (" x ", " y ")")
    (cond
       ((eq? button 1)
-         ; let's calculate clicked tile: TBD.
+         ; перевод из экранных координат в координаты карты
+         (let*((mw (- (ref window 3) (ref window 1)))
+               (mh (- (ref window 4) (ref window 2)))
+               (W screen-width) (H screen-height)
+               (x (floor (+ (ref window 1) (* mw (/ x W)))))
+               (y (floor (+ (ref window 3) (* mh (/ y H))))))
+            (print "map x: " x)
+            (print "map y: " y))
 
          #true)
       ((eq? button 3) ; ПКМ
@@ -364,18 +372,7 @@
             ;  причем следующего можно дергать только после того, как отработают все запланированные анимации хода
             (for-each (lambda (creature)
                   ; для тестов - пусть каждый скелет получает урон "-50"
-                  (let ((state (interact creature (tuple 'get 'state)))
-                        (state-machine (or (interact creature (tuple 'get 'state-machine)) #empty)))
-                     (print "state: " state)
-                     (print "state-machine: " state-machine)
-                  (let*((state (get state-machine state #empty))
-                        (handler (getf state 'damage))) ; 'damage - нанести урон
-                     (print "tick: " (getf state 'tick))
-                     (print "handler: " handler)
-                     (let ((state (handler creature 50)))
-                        (print "new-state: " state)
-                        (if state (mail creature (tuple 'set 'state state))))
-                     (print "ok."))))
+                  (make-action creature 'damage 50))
                (interact 'creatures (tuple 'get 'skeletons)))
             (print "turn done.")
 

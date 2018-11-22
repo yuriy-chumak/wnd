@@ -206,12 +206,10 @@
 ; =================================================================
 ; эта функция проигрывает анимацию creature, ждет пока анимация не закончится
 ; и восстанавливает начальную анимацию.
-(define (play-animation creature animation next-animation) ; return #false
+(define (play-animation creature animation next-animation) ; returns #false
    (let ((started (time-ms))
          (saved-animation (or next-animation (interact creature (tuple 'get 'animation))))
          (duration (interact creature (tuple 'set-current-animation animation))))
-      (print "duration: " duration)
-      (print "saved-animation: " saved-animation)
       (if duration
          (let*((duration (substring duration 0 (- (string-length duration) 2)))
                (duration (string->number duration 10))); decoded duration in ms
@@ -232,6 +230,21 @@
    ; вот тут у нас
    #false
 )
+
+(define (make-action creature action . args)
+   (let ((state (interact creature (tuple 'get 'state)))
+         (state-machine (or (interact creature (tuple 'get 'state-machine)) #empty)))
+      (print "state: " state)
+      (print "state-machine: " state-machine)
+
+      (let*((state (get state-machine state #empty))
+            (handler (getf state action)))
+         (print "handler: " handler)
+         (let ((state (apply handler (cons creature args))))
+            (print "new-state: " state)
+            (if state (mail creature (tuple 'set 'state state))))
+         (print "ok."))))
+
 ; =================================================================
 ; NEW STATE SUBSYSTEM:
 ; каждое состояние первым параметром принимает pnc, чей стейт
