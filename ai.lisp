@@ -1,7 +1,7 @@
 #!/usr/bin/ol
 
 ; алгоритм поиска пути
-; level: list of lists, collision сетка игровоuj уровня. все, что не 0 непроходимо
+; level: list of lists, collision сетка игрового уровня. все, что не 0 - непроходимо
 (define (A* level from-x from-y to-x to-y)
    (let ((xy (cons from-x from-y))
 
@@ -94,3 +94,105 @@
                                                 (cons (+ x 1) y)))))
                (step1 (- n 1) c-list-set o-list-set)))))))))
 
+; =================================================================
+(define (ai:make-action creature action . args)
+   (let ((state (interact creature (tuple 'get 'state)))
+         (state-machine (or (interact creature (tuple 'get 'state-machine)) #empty)))
+      (print "state: " state)
+      (print "state-machine: " state-machine)
+
+      (let*((state (get state-machine state #empty))
+            (handler (getf state action)))
+         (print "handler: " handler)
+         (let ((state (apply handler (cons creature args))))
+            (print "new-state: " state)
+            (if state (mail creature (tuple 'set 'state state))))
+         (print "ok."))))
+
+; =================================================================
+; NEW STATE SUBSYSTEM:
+; каждое состояние первым параметром принимает pnc, чей стейт
+; набор ключей в стейтах - то, что делают с нами (и что может изменить наш стейт)
+; отдельно есть набор функций того, что можем делать мы
+
+(define (do-nothing . creature)
+   #false) ; состояние не меняем
+
+(define (got-damage creature damage)
+   (print creature ": got-damage " damage)
+   ; пока просто будем отнимать урон от здоровья, без всякой умной логики
+   (let*((life (or (interact creature (tuple 'get 'life)) 100))
+         (life (- life damage)))
+      ; todo: рисуем партикл "- ХХХ" или "miss"
+      (print "damage done: " damage ", now life is: " life)
+      (mail creature (tuple 'set 'life life))
+      (cond
+         ((eq? damage 0) ; если нету урона, ничего не делаем
+            #false)
+         ((> life 0) ; пока живые, рисуем "хит" (или можем ничего не рисовать)
+            (play-animation creature 'swing #f))
+         ((<= life 0)
+            (play-animation creature 'die 'die) ; умираем, переходим в состояние "умерли"
+            'dead))))
+
+; машина состояний
+(define default-mob-state-machine (list->ff `(
+   ; состояние "сплю"
+   (sleeping . ,(list->ff `(
+      ; обычный регулярный мировой тик (а нужен ли?)
+      (tick . ,do-nothing)
+
+      ; до npc долетел какой-то звук (todo: добавить направление, возможно)
+      (sound . ,(lambda (creature sound-level) ; сила звука, в дБ
+            ; так как спим, то реагируем только на действительно сильные звуки
+            (if (> sound-level 60)
+               (begin
+                  ; проиграть анимацию "встаю" (эта функция выйдет после того, как анимация закончится)
+                  (play-animation creature 'swing #f)
+                  ; перейти в режим преследования, иначе спим дальше
+                  'pursuit))))
+
+      ; нам нанесли урон
+      (damage . ,got-damage))))
+
+   ; режим преследования
+   (pursuit . ,(list->ff `(
+      (tick . ,do-nothing)
+      ;; (tick . ,(lambda (creature)
+      ;;    ; пускай наш дорогой скелет поищет путь к сундуку и попытается его ударить
+      ;;    (define location (interact creature (tuple 'get-location))) ; текущее положение npc
+      ;;    (define chest (interact 'chest (tuple 'get-location))) ; положение сундука (в будущем - героя)
+      ;;    ; moveq - возможное направление к сундуку, (tuple x y служебная-информация)
+      ;;    (define moveq
+      ;;       (A* collision-data
+      ;;          (car location) (cdr location)
+      ;;          (car chest) (cdr chest)))
+      ;;    (define move (cons (ref moveq 1) (ref moveq 2)))
+
+      ;;    ; move relative:
+      ;;    ; todo: set as internal function(event or command)
+      ;;    (let*((itself (put itself 'location (cons (+ (car location) (car move)) (+ (cdr location) (cdr move)))))
+      ;;          (orientation (cond
+      ;;             ((equal? move '(-1 . 0)) 6)
+      ;;             ((equal? move '(0 . -1)) 0)
+      ;;             ((equal? move '(+1 . 0)) 2)
+      ;;             ((equal? move '(0 . +1)) 4)
+      ;;             (else (get itself 'orientation 0))))
+      ;;          (itself (put itself 'orientation orientation)))
+      ;;       ; todo: проверить стоит ли продолжать преследование - если мало здоровья, то надо убегать.
+      ;;    (values itself 'pursuit))))
+
+      ; до нпс долетел звук (пофиг на звуки)
+      (sound . ,do-nothing)
+      ; нпс нанесен урон
+      (damage . ,got-damage))))
+
+   ; если умер, то умер :)
+   (dead . ,(list->ff `(
+      (tick . ,do-nothing)
+      (sound . ,do-nothing)
+      (damage . ,do-nothing)))))))
+
+(define (invoke-state-action action . args)
+   #true
+)

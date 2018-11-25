@@ -1,34 +1,78 @@
 (import (file ini))
 (import (scheme misc))
 
+; задать созданию набор анимаций (тайлсет, конфигурационный файл)
+(define (creature:set-animations creature name inifile)
+   (mail creature (tuple 'set-animations name inifile)))
+; выбрать персонажу текущую анимацию по ее имени
+(define (creature:set-current-animation creature animation)
+   (interact creature (tuple 'set-current-animation animation)))
 
-; servers with numbers - creatures!
-;; (fork-server 'creatures (lambda ()
-;; (let this ((id 1) (itself #empty))
-;; (let*((envelope (wait-mail))
-;;       (sender msg envelope))
-;;    (tuple-case msg
-;;       ; low level interaction interface
-;;       ((new)
-;;          (mail sender id)
-;;          (this (+ id 1) (put itself id #true)))
-;;       ((kill id)
-;;          (this itself id (del itself id)))
-;;       ((debug)
-;;          (mail sender itself)
-;;          (this id itself)))))))
+; отыграть цикл анимации (с ожиданием)
+(define (play-animation creature animation next-animation) ; returns #false
+   (let ((started (time-ms))
+         (saved-animation (or next-animation (interact creature (tuple 'get 'animation))))
+         (duration (creature:set-current-animation creature animation)))
+      (let loop ((unused #f))
+         ;(print creature ": waiting for " (- (time-ms) started))
+         (if (< (- (time-ms) started) duration)
+            (loop (sleep 7))))
+      (unless (eq? saved-animation animation)
+         ; set next animation or restore saved
+         (creature:set-current-animation creature saved-animation)))
+   #false)
 
 
+; содержит список крич, где 0..N - npc, ну или по имени (например, 'hero - герой)
+(fork-server 'creatures (lambda ()
+   (let this ((itself #empty))
+      (let*((envelope (wait-mail))
+            (sender msg envelope))
+         (tuple-case msg
+            ; low level interaction interface
+            ((set key data)
+               (let ((itself (put itself key data)))
+                  (this itself)))
+            ((get key)
+               (mail sender (get itself key #false))
+               (this itself))
+            ((debug)
+               (mail sender itself)
+               (this itself))
+
+            ((ready?)
+               ; вот тут надо посетить каждого из npc и просто сделать ему interact,
+               ; это позволит убедиться, что все npc закончили обдумывать свои дела
+               ; и их наконец то можно рисовать
+               (mail sender
+                  (ff-fold (lambda (* key value)
+                              (cond
+                                 ((list? value)
+                                    (for-each (lambda (id) (interact id (tuple 'debug))) value))
+                                 ((symbol? value)
+                                    (interact value (tuple 'debug)))
+                                 (else
+                                    (print "unknown creature: " value)))
+                              #true)
+                     #t itself))
+               (this itself))
+            ;
+            (else
+               (print-to stderr "Unknown creatures command: " msg)
+               (this itself)))))))
+
+
+; --------------------------
 ; имеет отношение к анимации:
 (define orientations (list->ff `(
-   (0 . ,(* 3 32)) ; top
-   (1 . ,(* 4 32)) ; top-right
-   (2 . ,(* 5 32)) ; right
-   (3 . ,(* 6 32)) ; right-bottom
-   (4 . ,(* 7 32)) ; bottom
-   (5 . ,(* 0 32)) ; left-bottom
-   (6 . ,(* 1 32)) ; left
-   (7 . ,(* 2 32))))) ;left-top
+   (0 . 3) ; top
+   (1 . 4) ; top-right
+   (2 . 5) ; right
+   (3 . 6) ; right-bottom
+   (4 . 7) ; bottom
+   (5 . 0) ; left-bottom
+   (6 . 1) ; left
+   (7 . 2)))) ;left-top
 (define speed 64) ; 1 tile per second
 
 ; todo: make automatic id generation
@@ -52,15 +96,12 @@
          ; ---------------------------------------------
          ; блок обработки анимации
          ; set animation
-         ((set-animations ini first-gid)
-            (let*((itself (put itself 'fg first-gid))
-                  (itself (put itself 'animations ini)))
+         ;  задать имя тайловой карты и конфигурационный файл анимаций персонажа
+         ((set-animations name ini)
+            (let*((itself (put itself 'fg (getf (interact 'level (tuple 'get 'gids)) name)))
+                  (itself (put itself 'animations (list->ff (ini-parse-file ini)))))
                (this itself)))
-         ;; ((set-default-animation animation)
-         ;;    ; set default animation
-         ;;    (let*((itself (put itself 'default-animation animation))
-         ;;          (itself (put itself 'ssms (time-ms))))
-         ;;       (this itself)))
+
          ((set-current-animation animation)
             ; set current animation (that will be changed, or not to default)
             ; return animation cycle time (for feature use by caller)
@@ -68,8 +109,22 @@
                   (itself (put itself 'ssms (time-ms))))
                ; сообщим вызывающему сколько будет длиться полный цикл анимации
                ; (так как у нас пошаговая игра, то вызывающему надо подождать пока проиграется цикл анимации)
-               (let ((animation-info (getf (get itself 'animations #empty) (getf itself 'animation))))
-                  (mail sender (if animation-info (getf animation-info 'duration))))
+               (let*((animation-info (getf (get itself 'animations #empty) (getf itself 'animation)))
+                     (duration (getf animation-info 'duration))
+                     (duration (substring duration 0 (- (string-length duration) 2)))
+                     (duration (string->number duration 10))
+                     (frames (get animation-info 'frames "4"))
+                     (frames (string->number frames 10))
+                     (animation-type (get animation-info 'type ""))
+                     (duration (if (string-eq? animation-type "back_forth")
+                                 (floor (* (+ frames frames -1)))
+                                 duration)))
+                     ; decoded duration in ms
+                  (mail sender #|duration|#
+                     (if (string-eq? animation-type "back_forth")
+                           (* 100 (+ frames frames -1))
+                           (* 100 frames))
+                  ))
                (this itself)))
          ((get-animation-frame)
             ; todo: change frames count according to animation type (and fix according math)
@@ -83,11 +138,22 @@
                   (duration (string->number duration 10))
                   (frames (get animation 'frames "4"))
                   (frames (string->number frames 10))
+                  (duration (if (string-eq? animation-type "back_forth")
+                              (floor (* (+ frames frames -1)))
+                              duration))
+
+                  (duration
+                     (if (string-eq? animation-type "back_forth")
+                           (* 100 (+ frames frames -1))
+                           (* 100 frames)))
+
+
                   (position (get animation 'position "4"))
                   (position (string->number position 10))
                   (orientation (get itself 'orientation 0))
                   (frame (floor (/ (* ssms frames) duration))))
                ;(print "animation-type: " animation-type)
+               ;(print "orientation: " orientation)
                (mail sender (+ (get itself 'fg 0) position
                   (cond
                      ((string-eq? animation-type "play_once")
@@ -96,7 +162,7 @@
                         (mod frame frames))
                      ((string-eq? animation-type "back_forth")
                         (lref (append (iota frames) (reverse (iota (- frames 2) 1))) (mod frame (+ frames frames -2)))))
-                  (get orientations orientation 0))))
+                  (* 48 (get orientations orientation 0)))))
             (this itself))
 
          ; ---------------------------------------------

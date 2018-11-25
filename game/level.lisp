@@ -2,27 +2,26 @@
    (otus lisp)
    (file xml))
 (import (scheme misc))
-
+(import (only (lang intern) string->symbol))
 
 ; public interface
 (define (level:load filename)
    (interact 'level (tuple 'load filename)))
 
+(define (level:get-background)
+   (interact 'level (tuple 'get 'background-data)))
+
+(define (level:get-gid name)
+   (getf (interact 'level (tuple 'get 'gids)) name))
+
+
+; -----------------------------------------------
 ; helper functions
 (define split-by-comma (string->regex "c/,/"))
 (define split-by-newline (string->regex "c/\n/"))
 
 ; игровой уровень
 (fork-server 'level (lambda ()
-
-
-
-
-
-
-
-
-   ; this
    (let this ((itself #empty))
       (let*((envelope (wait-mail))
             (sender msg envelope))
@@ -58,6 +57,12 @@
 
                (define tilesets (xml-get-subtags level 'tileset))
                (print-to stderr "tilesets count: " (length tilesets))
+
+               (define gids (list->ff (map (lambda (tileset)
+                     (cons
+                        (string->symbol (xml-get-attribute tileset 'name "noname"))
+                        (string->number (xml-get-attribute tileset 'firstgid 0) 10)))
+                  tilesets)))
 
                ; make ff (id > tileset element)
                (define tileset
@@ -156,11 +161,13 @@
                   (width . ,width) (height . ,height)
                   (tilewidth . ,tilewidth)
                   (tileheight . ,tileheight)
+                  (gids . ,gids)
                   (tileset . ,tileset)
                   (background-data . ,background-data)
                   (object-data . ,object-data)
                   (collision . ,collision-data)))))
 
+            ; draw the level on the screen
             ((draw); interact
                (let ((w (getf itself 'tilewidth))
                      (h (getf itself 'tileheight))
@@ -171,15 +178,14 @@
                      (object-data (getf itself 'object-data)))
 
                   (define (X x y tw th)
-                     (+ (- (* x (/ w 2))
-                           (* y (/ w 2)))
-                        (- (/ (* width w) 4) (/ w 2))))
+                     (- (* x (/ w 2))
+                        (* y (/ w 2))
+                        (/ w 2)))
 
                   (define (Y x y tw th)
-                     (+ (+ (* x (/ h 2))
-                           (* y (/ h 2)))
+                     (+ (* x (/ h 2))
+                        (* y (/ h 2))
                         (- h th)))
-
 
                   ; эта функция рисует тайл на экране
                   ; примитивно, не оптимизировано - но ранняя оптимизация нам не нужна
