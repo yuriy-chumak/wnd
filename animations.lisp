@@ -10,7 +10,7 @@
          (duration (if (string-eq? animation "back_forth")
             (floor (* (+ frames frames -1)))
             duration)))
-         
+
       (if (string-eq? animation "back_forth")
             (* 100 (+ frames frames -1))
             (* 100 frames))

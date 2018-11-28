@@ -76,6 +76,7 @@
 
 ,load "creature.lisp"
 ,load "ai.lisp"
+,load "animations.lisp"
 
 ; временная функция работы с level-collision
 (define collision-data (interact 'level (tuple 'get 'collision)))
@@ -96,7 +97,7 @@
 
 
 ; loading animations
-;(define antlion-animation (list->ff (ini-parse-file "antlion.ini")))
+;(define antlion-animation (list->ff (ini-parse-file "animations/antlion.ini")))
 
 
 ;; ; find first skeleton id
@@ -119,7 +120,7 @@
 (make-creature 'hero #empty) (mail 'creatures (tuple 'set 'hero hero))
 (mail hero (tuple 'set-location '(51 . 61)))
 
-(creature:set-animations hero 'zombie "zombie.ini")
+(creature:set-animations hero 'zombie "animations/zombie.ini")
 ;не, не будем задавать никакую текущую анимацию персонажу. ;(interact 'hero (tuple 'set-current-animation 'run))
 
 ;; (mail 'hero (tuple 'set 'idle (lambda (itself)
@@ -180,7 +181,7 @@
 
 
 (for-each (lambda (id)
-      (creature:set-animations id 'goblin "goblin.ini")
+      (creature:set-animations id 'goblin "animations/goblin.ini")
       (creature:set-current-animation id 'stance))
    skeletons)
 
@@ -333,7 +334,7 @@
 
 
    ; coordinates
-   #|             
+   #|
    (glDisable GL_TEXTURE_2D)
    (glEnable GL_LINE_STIPPLE)
    (glLineWidth 2.0)
