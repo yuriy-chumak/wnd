@@ -1,18 +1,28 @@
 #!/usr/bin/ol
+
+; зададим конфигурацию графического окна
+(define-library (lib gl config)
+(export config) (import (otus lisp))
+(begin
+   (define config (list->ff `(
+      ; размеры окна в знакоместах
+      ; напомню, что мы используем фиксированный шрифт размера 9*16
+      (width . ,(* 2 80 9))
+      (height . ,(* 2 16 25)))))))
+(import (lib gl config))
+
 ; игра пошаговая! посему все ходы только после клика "я готов" (пока это ПКМ) и все НПС
 ; должны ходить по-очереди. при этом демонстрировать что они делают.
-(define screen-width 1280)
-(define screen-height 720)
+(define screen-width (getf config 'width))
+(define screen-height (getf config 'height))
 
 ; -=( main )=------------------------------------
 ; подключаем графические библиотеки, создаем окно
-(import (lib gl))
+(import (lib gl2))
 (import (otus ffi))
 (import (lib soil))
-(import (OpenGL version-2-1))
 (print "---------------")
 (gl:set-window-title "Drawing the tiled map")
-(gl:set-window-size screen-width screen-height) (glViewport 0 0 screen-width screen-height)
 
 ; сразу нарисуем сплеш
 (glOrtho 0 1 1 0 0 1)
@@ -37,6 +47,56 @@
 (gl:SwapBuffers (interact 'opengl (tuple 'get 'context)))
 (glDeleteTextures 1 (list id))
 
+; -------------------------------------------------------
+; теперь текстовая консолька
+(import (lib gl console))
+
+; временное окно дебага (покажем fps):
+(define fps (create-window 70 24 10 1))
+(define started (time-ms)) (define time (list 0))
+(define frames '(0 . 0))
+
+(set-window-writer fps (lambda (type)
+   (set-car! frames (+ (car frames) 1))
+   (let ((now (time-ms)))
+      (if (> now (+ started (car time) 1000))
+         (begin
+            (set-cdr! frames (car frames))
+            (set-car! frames 0)
+            (set-car! time (- now started)))))
+   (type GRAY (cdr frames) " fps")
+))
+
+
+;; (define hero (fasl-load "hero.bin" #empty))
+;; (print hero)
+;; (print (car hero))
+;; (print (type (caar hero)))
+;; (print (eq? (caar hero) 'sex))
+;; (halt 1)
+
+(define info (create-window 0 1 12 24))
+(set-window-background info BLACK)
+(set-window-writer info (lambda (echo)
+   (echo LIGHTBLUE (case 0 ;(getf hero 'race)
+      (0 "Человек")
+      (1 "Полуэльф")
+      (2 "Эльф")
+      (3 "Хоббит")
+      (4 "Карлик")
+      (5 "Гном")
+      (6 "Полуорк")
+      (7 "Полутролль")
+      (8 "Дунадан")
+      (9 "Высший Эльф")
+      (else "unknown")))
+
+   (move-to 0 1)
+   (echo LIGHTBLUE "Воин\n")
+   (echo LIGHTBLUE "Новобранец\n")
+   (echo WHITE "УРОВЕНЬ   1\n")
+   (echo WHITE "ОПЫТ      0\n")
+))
 
 ; ----------------
 ; музычка...
@@ -250,9 +310,6 @@
 
 ; init
 (glShadeModel GL_SMOOTH)
-(glClearColor 0.0 0.0 0.0 1)
-
-(glEnable GL_BLEND)
 (glBlendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA)
 
 (gl:hide-cursor)
@@ -299,9 +356,12 @@
    ;(interact 'creatures (tuple 'ready?))
 
    ; drawing
+   (glClearColor 0.0 0.0 0.0 1)
    (glClear GL_COLOR_BUFFER_BIT)
    (glLoadIdentity)
    (glOrtho (ref window 1) (ref window 3) (ref window 4) (ref window 2) -1 1) ; invert axis Y on screen!
+   (glEnable GL_TEXTURE_2D)
+   (glEnable GL_BLEND)
 
    ; попросим уровень отрисовать себя
    (interact 'level (tuple 'draw (if mouse (xy:screen->tile mouse)))) ; (level:draw)
@@ -357,6 +417,8 @@
    ;|#
 
 
+   ; окошки, консолька, etc.
+   (render-windows)
 
 
    ; -------------
