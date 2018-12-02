@@ -170,7 +170,7 @@
             ((0 1 2)
                (incr selection))
             (3
-               (fasl-save (list->ff `(
+               (fasl-save `(
                   (sex . ,(car sex)) ; Пол персонажа,
                   (race . ,(car race)) ; Раса и
                   (class . ,(car class)) ; Класс
@@ -182,7 +182,7 @@
                   (dexterity . ,(car dexterity)) ; Ловкость
                   (constitution . ,(car constitution)) ; Телосложение
                   (charm . ,(car charm)) ; Обаяние
-               )) "hero.bin")
+               ) "hero.bin")
                (syscall 59 (c-string "/usr/bin/ol") (map c-string '("/usr/bin/ol" "main.lisp")) #false)
                (halt 0))))
       ;; (vkRight
