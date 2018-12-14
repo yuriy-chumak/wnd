@@ -101,21 +101,40 @@
          (3 "Нажмите ENTER для выбора текущего параметров.")))
 ))
 
-; выбор пола персонажа
 (define sex-selection (create-window 2 11 10 2))
-(set-window-writer sex-selection (lambda (type)
-   (define (color x)
-      (if (eq? (car sex) x) CYAN WHITE))
-   (type
-      (color 0) "a) " 'female "Женский" #f "\n"
-      (color 1) "b) " 'male "Мужской" #f)
+(define race-selection (create-window 14 11 14 11))
+(define class-selection (create-window 24 11 32 11))
+(define make-a-choise (create-window 5 5 6 6))
+
+(define (update-window-borders)
+   (set-window-border sex-selection (if (eq? (car selection) 0) GRAY))
+   (set-window-border race-selection (if (eq? (car selection) 1) GRAY))
+   (set-window-border class-selection (if (eq? (car selection) 2) GRAY))
+   (set-window-border make-a-choise (if (eq? (car selection) 3) GRAY)))
+(update-window-borders)
+
+
+; функция-помощник, создает функцию подсвечивания выбора и обработки клика мышкой
+(define (make-printer sel var write)
+   (lambda (x . args)
+      (apply write (append (list
+         (if (eq? (car var) x) CYAN WHITE) (lambda ()
+                                             (set-car! selection sel) (set-car! var x)
+                                             (update-window-borders)))
+         args))
+      (write "\n")))
+
+; выбор пола персонажа
+(set-window-writer sex-selection (lambda (write)
+   (define print (make-printer 0 sex write))
+
+   (print 0 "a) Женский")
+   (print 1 "b) Мужской")
 ))
 
 ; выбор расы персонажа
-(define race-selection (create-window 14 11 32 11))
-(set-window-writer race-selection (lambda (type)
-   (define (color x)
-      (if (eq? (car race) x) CYAN WHITE))
+(set-window-writer race-selection (lambda (write)
+   (define print (make-printer 1 race write))
    (define (sign ab)
       (if (< ab 0) "-" "+"))
    (define str (car strength))
@@ -127,29 +146,29 @@
 
    (case (car selection)
       (0 #false) ; если выбирают персонажа, ничего не пишем
-      (1 (apply type (list
-            (color 0) "a) Человек" #f "     Сил: " (sign str) str "\n"
-            (color 1) "b) Полуэльф" #f "    Инт: " (sign int) int "\n"
-            (color 2) "c) Эльф" #f "        Муд: " (sign wis) wis "\n"
-            (color 3) "d) Хоббит" #f "      Лов: " (sign dex) dex "\n"
-            (color 4) "e) Карлик" #f "      Тел: " (sign con) con "\n"
-            (color 5) "f) Гном" #f "        Оба: " (sign cha) cha "\n"
-            (color 6) "g) Полуорк" #f "     Здоровье   : " 10     "\n"
-            (color 7) "h) Полутролль" #f "  Опыт       : " 100 "%""\n"
-            (color 8) "i) Дунадан" #f "     Инфразрение: " 0 " фт""\n"
-            (color 9) "j) Высший Эльф" #f)))
-;           (color 10) "k) Кобольд" #f
-      ((2 3 4) (apply type (list
-            (color 0) "a) Человек" #f "     \n"
-            (color 1) "b) Полуэльф" #f "    \n"
-            (color 2) "c) Эльф" #f "        \n"
-            (color 3) "d) Хоббит" #f "      \n"
-            (color 4) "e) Карлик" #f "      \n"
-            (color 5) "f) Гном" #f "        \n"
-            (color 6) "g) Полуорк" #f "     \n"
-            (color 7) "h) Полутролль" #f "  \n"
-            (color 8) "i) Дунадан" #f "     \n"
-            (color 9) "j) Высший Эльф" #f)))
+      (1
+         (print 0 "a) Человек" #f "     Сил: " (sign str) str)
+         (print 1 "b) Полуэльф" #f "    Инт: " (sign int) int)
+         (print 2 "c) Эльф" #f "        Муд: " (sign wis) wis)
+         (print 3 "d) Хоббит" #f "      Лов: " (sign dex) dex)
+         (print 4 "e) Карлик" #f "      Тел: " (sign con) con)
+         (print 5 "f) Гном" #f "        Оба: " (sign cha) cha)
+         (print 6 "g) Полуорк" #f "     Здоровье   : " 10)
+         (print 7 "h) Полутролль" #f "  Опыт       : " 100 "%")
+         (print 8 "i) Дунадан" #f "     Инфразрение: " 0 " фт")
+         (print 9 "j) Высший Эльф" #f)
+         (print 10 "k) Кобольд" #f))
+      ;; ((2 3 4) (apply type (list
+      ;;       (color 0) "a) Человек" #f "     \n"
+      ;;       (color 1) "b) Полуэльф" #f "    \n"
+      ;;       (color 2) "c) Эльф" #f "        \n"
+      ;;       (color 3) "d) Хоббит" #f "      \n"
+      ;;       (color 4) "e) Карлик" #f "      \n"
+      ;;       (color 5) "f) Гном" #f "        \n"
+      ;;       (color 6) "g) Полуорк" #f "     \n"
+      ;;       (color 7) "h) Полутролль" #f "  \n"
+      ;;       (color 8) "i) Дунадан" #f "     \n"
+      ;;       (color 9) "j) Высший Эльф" #f)))
    )
 ))
 
@@ -163,6 +182,7 @@
 (gl:set-keyboard-handler (lambda (key)
    (define (incr x) (set-car! x (mod (+ (car x) +1) (cdr x))))
    (define (decr x) (set-car! x (mod (+ (car x) -1 (cdr x)) (cdr x))))
+
    (case key
       (vkQ (halt vkQ))
       (vkEsc (halt 0))
@@ -170,11 +190,13 @@
       (vkLeft
          (case (car selection)
             ((1 2 3)
-               (decr selection))))
+               (decr selection)))
+         (update-window-borders))
       (vkRight
          (case (car selection)
             ((0 1 2)
-               (incr selection))))
+               (incr selection)))
+         (update-window-borders))
 
       (vkUp
          (case (car selection)
@@ -225,12 +247,17 @@
          (print "unhandled key: " key)))))
 
 (gl:set-mouse-handler (lambda (button x y)
-   (case (windows-make-selection x y)
-      ('male
-         (print "male"))
-      ('female
-         (print "female"))
-   )))
+   (let ((selection (windows-make-selection x y)))
+      (cond
+         ((symbol? selection)
+            (case selection
+               ('male
+                  (print "male"))
+               ('female
+                  (print "female"))
+            ))
+         ((function? selection)
+            (selection))))))
 
 ; вот тут ждем пока не будет сделан окончательный выбор
 ;; (let loop ((* #f))
