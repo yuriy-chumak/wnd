@@ -1,5 +1,14 @@
 #!/usr/bin/ol
 
+; читаємо нашого героя
+(define характер (fasl-load "hero.fasl" #false))
+(if (eq? характер #false)
+   (begin
+      (print "будь ласка, спершу створіть героя.") (halt 1)))
+
+; (if a b c)
+
+
 ; зададим конфигурацию графического окна
 (define-library (lib gl config)
 (export config) (import (otus lisp))
@@ -77,6 +86,7 @@
 
 (define info (create-window 0 1 12 24))
 (set-window-background info BLACK)
+(set-window-border info GRAY)
 (set-window-writer info (lambda (echo)
    (echo LIGHTBLUE (case 0 ;(getf hero 'race)
       (0 "Человек")
@@ -366,6 +376,9 @@
    ; попросим уровень отрисовать себя
    (interact 'level (tuple 'draw (if mouse (xy:screen->tile mouse)))) ; (level:draw)
 
+   ; окошки, консолька, etc.
+   (render-windows)
+
    ; let's draw mouse pointer
    (if mouse
       (let*((ms (mod (floor (/ (time-ms) 100)) 40))
@@ -377,6 +390,8 @@
             ; window mouse to opengl mouse:
             (x (+ (ref window 1) (* (car mouse) (- (ref window 3) (ref window 1)) (/ 1 screen-width))))
             (y (+ (ref window 2) (* (cdr mouse) (- (ref window 4) (ref window 2)) (/ 1 screen-height)))))
+         (glEnable GL_TEXTURE_2D)
+         (glEnable GL_BLEND)
          (glBindTexture GL_TEXTURE_2D (ref tile 1))
          (glBegin GL_QUADS)
             (glTexCoord2f (ref st 1) (ref st 2))
@@ -417,8 +432,6 @@
    ;|#
 
 
-   ; окошки, консолька, etc.
-   (render-windows)
 
 
    ; -------------
