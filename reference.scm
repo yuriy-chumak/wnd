@@ -10,6 +10,37 @@
       (width . ,(* 80 9))
       (height . ,(* 16 25)))))))
 
+; -------------------------------------------------------------------
+; подключение графической библиотеки и библиотеки графической консоли
+(import (lib gl2))
+(import (lib soil))
+; и сразу нарисуем сплеш
+(glOrtho 0 1 1 0 0 1)
+(glEnable GL_TEXTURE_2D)
+(define splash
+   (SOIL_load_OGL_texture (c-string "tmp/splash.png") SOIL_LOAD_RGBA SOIL_CREATE_NEW_ID 0))
+(glBindTexture GL_TEXTURE_2D splash)
+(glBegin GL_QUADS)
+   (glTexCoord2f 0 0)
+   (glVertex2f 0 0)
+
+   (glTexCoord2f 1 0)
+   (glVertex2f 1 0)
+
+   (glTexCoord2f 1 1)
+   (glVertex2f 1 1)
+
+   (glTexCoord2f 0 1)
+   (glVertex2f 0 1)
+(glEnd)
+(glDisable GL_TEXTURE_2D)
+(gl:SwapBuffers (interact 'opengl (tuple 'get 'context)))
+(glDeleteTextures 1 (list splash))
+(import (lib gl console))
+(import (otus random!))
+
+
+
 ; блок переменных - индикаторов выбора пользователя
 (define selection '(0 . 4))
 
@@ -30,11 +61,6 @@
 
 
 
-; -------------------------------------------------------------------
-; подключение графической библиотеки и библиотеки графической консоли
-(import (lib gl2))
-(import (lib gl console))
-(import (otus random!))
 
 ; временное окно дебага (покажем fps):
 (define fps (create-window 70 24 10 1))
