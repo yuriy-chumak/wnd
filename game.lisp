@@ -6,14 +6,44 @@
 (define клас '(0))
 
 (define сила '(0))
+(define інтелект '(0))
+(define мудрість '(0))
+(define спритність '(0))
+(define тіло '(0))
+(define чарівність '(0))
 
 ,load "характеристики.lisp"
 
-(define (перерахувати-характеристики)
+(define (перерахувати-характеристики-сила)
    (set-car! сила
       (get-сила (car раса) (car клас))))
+      
+(define (перерахувати-характеристики-інтелект)
+   (set-car! інтелект
+      (get-інтелект (car раса) (car клас))))
 
-(перерахувати-характеристики)
+(define (перерахувати-характеристики-мудрість)
+   (set-car! мудрість
+      (get-мудрість (car раса) (car клас))))
+      
+(define (перерахувати-характеристики-спритність)
+   (set-car! спритність
+      (get-спритність (car раса) (car клас))))
+
+(define (перерахувати-характеристики-тіло)
+   (set-car! тіло
+      (get-тіло (car раса) (car клас))))
+      
+(define (перерахувати-характеристики-чарівність)
+   (set-car! чарівність
+      (get-чарівність (car раса) (car клас))))
+
+(перерахувати-характеристики-сила)
+(перерахувати-характеристики-інтелект)
+(перерахувати-характеристики-мудрість)
+(перерахувати-характеристики-спритність)
+(перерахувати-характеристики-тіло)
+(перерахувати-характеристики-чарівність)
 
 ; зададим конфигурацию графического окна
 (define-library (lib gl config)
@@ -31,7 +61,9 @@
 (define запрошення (create-window 2 2 76 5))
 (set-window-writer запрошення (lambda (write)
    (write CYAN 'hello "Створіть героя за допомогою наступних меню:\n\n" #f)
-   (write WHITE "Використайте " BLUE "курсорні клавіші")
+   (write WHITE "Використайте '" CYAN "курсорні клавіші" WHITE "' для прокрутки меню, '" CYAN "Enter" WHITE "' - для вибору,\n" #f)
+   (write WHITE "'" CYAN "*" WHITE "' - для випадкового вибору, '" CYAN "esc" WHITE "' - почати спочатку,\n" #f)
+   (write WHITE "'" CYAN "=" WHITE "' - настройки народження, '" CYAN "?" WHITE "' - справка, '" CYAN "Ctrl-x" WHITE "' - для виходу.")
 ))
 
 (define підказка (create-window 2 9 76 1))
@@ -107,7 +139,7 @@
       (vkQ (halt vkQ))
       (vkEnter
          (print "зберігаю налаштування в файл.")
-         (fasl-save (list (car стать) (car раса) (car клас) (car сила)) "hero.fasl")
+         (fasl-save (list (car стать) (car раса) (car клас) (car сила) (car інтелект)) "hero.fasl")
          (halt vkEnter))
    )))
 
@@ -176,7 +208,12 @@
          (set-car! номер-підказки 2)
          (set-car! клас 5))
    )
-   (перерахувати-характеристики)
+   (перерахувати-характеристики-сила)
+   (перерахувати-характеристики-інтелект)
+   (перерахувати-характеристики-мудрість)
+   (перерахувати-характеристики-спритність)
+   (перерахувати-характеристики-тіло)
+   (перерахувати-характеристики-чарівність)
 ))
 
 
@@ -193,6 +230,75 @@
       (write x))
 
    (write YELLOW)
-   (write "сила ") (p (car сила))
+   (write "сила " #f) (p (car сила))
 ))
 
+(define показник (create-window 48 13 11 1))
+(set-window-writer показник (lambda (write)
+   (define (p x)
+      (cond
+         ((> x 0)
+            (write "+"))
+         ((= x 0)
+            (write " ")))
+      (write x))
+
+   (write YELLOW)
+   (write "інтелект ") (p (car інтелект))
+))
+
+(define показник (create-window 48 14 15 1))
+(set-window-writer показник (lambda (write)
+   (define (p x)
+      (cond
+         ((> x 0)
+            (write "+"))
+         ((= x 0)
+            (write " ")))
+      (write x))
+
+   (write YELLOW)
+   (write "мудрість ") (p (car мудрість))
+))
+
+(define показник (create-window 48 15 15 1))
+(set-window-writer показник (lambda (write)
+   (define (p x)
+      (cond
+         ((> x 0)
+            (write "+"))
+         ((= x 0)
+            (write " ")))
+      (write x))
+
+   (write YELLOW)
+   (write "спритність ") (p (car спритність))
+))
+
+(define показник (create-window 48 16 15 1))
+(set-window-writer показник (lambda (write)
+   (define (p x)
+      (cond
+         ((> x 0)
+            (write "+"))
+         ((= x 0)
+            (write " ")))
+      (write x))
+
+   (write YELLOW)
+   (write "тіло ") (p (car тіло))
+))
+
+(define показник (create-window 48 17 15 1))
+(set-window-writer показник (lambda (write)
+   (define (p x)
+      (cond
+         ((> x 0)
+            (write "+"))
+         ((= x 0)
+            (write " ")))
+      (write x))
+
+   (write YELLOW)
+   (write "чарівність ") (p (car чарівність))
+))
