@@ -246,7 +246,9 @@
 
                   (draw-layer object-data (append creatures (list
                      ; (tuple destination 552) ; временно - сундук
-                     (tuple (interact 'chest (tuple 'get-location)) 552)
+                     (tuple (interact 'hero (tuple 'get-location)) 296)
+
+                     ;(tuple (interact 'chest (tuple 'get-location)) 552)
                      ; хорошо бы сюда еще игрока добавить... но его рисовать сложнее, так что пока отложим
                      ; временно пусть это будет зомби ))
                      ;(tuple (interact 'hero (tuple 'get-location)) (interact 'hero (tuple 'get-animation-frame)))

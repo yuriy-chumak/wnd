@@ -77,18 +77,11 @@
 ))
 
 
-;; (define hero (fasl-load "hero.bin" #empty))
-;; (print hero)
-;; (print (car hero))
-;; (print (type (caar hero)))
-;; (print (eq? (caar hero) 'sex))
-;; (halt 1)
-
 (define info (create-window 0 1 12 24))
 (set-window-background info BLACK)
 (set-window-border info GRAY)
 (set-window-writer info (lambda (echo)
-   (echo LIGHTBLUE (case 0 ;(getf hero 'race)
+   (echo LIGHTBLUE (case (list-ref характер 1)
       (0 "Человек")
       (1 "Полуэльф")
       (2 "Эльф")
@@ -171,15 +164,7 @@
 
 
 ;; ; find first skeleton id
-;; (define hero_pos (xml-get-subtag level 'properties))
-;; (define hero_pos (car (filter (lambda (tag) (string-eq? (xml-get-attribute tag 'name "") "hero_pos")) (xml-get-value hero_pos))))
-;; (define hero_pos (xml-get-attribute hero_pos 'value #f))
-;; (define hero_pos (split-by-comma hero_pos))
-;; (define hero_pos (cons
-;;    (string->number (car hero_pos) 10)
-;;    (string->number (cadr hero_pos) 10)))
-;; (define hero_pos (cons 51 61)) ; TODO: move to level
-
+(define hero_pos (cons 28 33))
 (define calculating-world (box 0))
 
 
@@ -188,10 +173,14 @@
 (define hero-destination '(51 . 61)) ; точка, куда надо идти герою
 
 (make-creature 'hero #empty) (mail 'creatures (tuple 'set 'hero hero))
-(mail hero (tuple 'set-location '(51 . 61)))
+(mail hero (tuple 'set-location hero_pos))
 
-(creature:set-animations hero 'zombie "animations/zombie.ini")
-;не, не будем задавать никакую текущую анимацию персонажу. ;(interact 'hero (tuple 'set-current-animation 'run))
+(creature:set-animations hero 'skeleton "animations/skeleton.ini")
+;;    (mail 'skeleton (tuple 'set-animations skeleton-animation firstgid)))
+;; (mail 'skeleton (tuple 'set-location hero_pos))
+
+;не, не будем задавать никакую текущую анимацию персонажу.
+(interact 'hero (tuple 'set-current-animation 'stance))
 
 ;; (mail 'hero (tuple 'set 'idle (lambda (itself)
 ;;    (define location (getf itself 'location))
