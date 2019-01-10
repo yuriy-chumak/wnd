@@ -4,6 +4,7 @@
 ; задать созданию набор анимаций (тайлсет, конфигурационный файл)
 (define (creature:set-animations creature name inifile)
    (mail creature (tuple 'set-animations name inifile)))
+
 ; выбрать персонажу текущую анимацию по ее имени
 (define (creature:set-current-animation creature animation)
    (interact creature (tuple 'set-current-animation animation)))
@@ -99,7 +100,9 @@
          ;  задать имя тайловой карты и конфигурационный файл анимаций персонажа
          ((set-animations name ini)
             (let*((itself (put itself 'fg (getf (interact 'level (tuple 'get 'gids)) name)))
-                  (itself (put itself 'animations (list->ff (ini-parse-file ini)))))
+                  (itself (put itself 'animations (list->ff (ini-parse-file ini))))
+                  (itself (put itself 'columns (getf (interact 'level (tuple 'get 'columns)) name))))
+               (print name ": " itself)
                (this itself)))
 
          ((set-current-animation animation)
@@ -130,6 +133,7 @@
             ; todo: change frames count according to animation type (and fix according math)
             (let*((animation (get itself 'animation 'stance)) ; соответствующая состояния анимация
                   (ssms (- (time-ms) (get itself 'ssms 0))) ; количество ms с момента перехода в анимацию
+                  (columns (get itself 'columns 32))
                   (animations (get itself 'animations #empty))
                   (animation (get animations animation #empty))
                   (animation-type (get animation 'type #false))
@@ -152,8 +156,6 @@
                   (position (string->number position 10))
                   (orientation (get itself 'orientation 0))
                   (frame (floor (/ (* ssms frames) duration))))
-               ;(print "animation-type: " animation-type)
-               ;(print "orientation: " orientation)
                (mail sender (+ (get itself 'fg 0) position
                   (cond
                      ((string-eq? animation-type "play_once")
@@ -162,7 +164,7 @@
                         (mod frame frames))
                      ((string-eq? animation-type "back_forth")
                         (lref (append (iota frames) (reverse (iota (- frames 2) 1))) (mod frame (+ frames frames -2)))))
-                  (* 48 (get orientations orientation 0)))))
+                  (* columns (get orientations orientation 0)))))
             (this itself))
 
          ; ---------------------------------------------

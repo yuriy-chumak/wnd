@@ -63,6 +63,12 @@
                         (string->symbol (xml-get-attribute tileset 'name "noname"))
                         (string->number (xml-get-attribute tileset 'firstgid 0) 10)))
                   tilesets)))
+               (define columns (list->ff (map (lambda (tileset)
+                     (cons
+                        (string->symbol (xml-get-attribute tileset 'name "noname"))
+                        (string->number (xml-get-attribute tileset 'columns 0) 10)))
+                  tilesets)))
+               (print "columns: " columns)
 
                ; make ff (id > tileset element)
                (define tileset
@@ -162,6 +168,7 @@
                   (tilewidth . ,tilewidth)
                   (tileheight . ,tileheight)
                   (gids . ,gids)
+                  (columns . ,columns)
                   (tileset . ,tileset)
                   (background-data . ,background-data)
                   (object-data . ,object-data)
@@ -240,13 +247,14 @@
                   ;   рисовать мы их будем все вместе - слой "object" и наших creatures
 
                   ; список NPC:
-                  (define creatures (map (lambda (id)
+                  (define creatures '())#|(map (lambda (id)
                         (tuple (interact id (tuple 'get-location)) (interact id (tuple 'get-animation-frame))))
-                     (interact 'creatures (tuple 'get 'skeletons))))
+                     (interact 'creatures (tuple 'get 'skeletons))))|#
 
                   (draw-layer object-data (append creatures (list
                      ; (tuple destination 552) ; временно - сундук
-                     (tuple (interact 'hero (tuple 'get-location)) 296)
+                     (tuple (interact 'hero (tuple 'get-location))
+                            (interact 'hero (tuple 'get-animation-frame)))
 
                      ;(tuple (interact 'chest (tuple 'get-location)) 552)
                      ; хорошо бы сюда еще игрока добавить... но его рисовать сложнее, так что пока отложим

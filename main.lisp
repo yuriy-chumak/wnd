@@ -95,7 +95,15 @@
       (else "unknown")))
 
    (move-to 0 1)
-   (echo LIGHTBLUE "Воин\n")
+   (echo LIGHTBLUE (case (list-ref характер 1)
+      (0 "Воїн\n")
+      (1 "Маг\n")
+      (2 "Священник\n")
+      (3 "Крадій\n")
+      (4 "Слідопит\n")
+      (5 "Паладін\n")
+      (else "unknown\n")))
+
    (echo LIGHTBLUE "Новобранец\n")
    (echo WHITE "УРОВЕНЬ   1\n")
    (echo WHITE "ОПЫТ      0\n")
@@ -312,10 +320,37 @@
 (glBlendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA)
 
 (gl:hide-cursor)
+(resize 1/3)
 
 (define timestamp (box 0))
 ; draw
 (gl:set-renderer (lambda (mouse)
+   (let*((mousetile (xy:screen->tile mouse))
+         (herotile (interact 'hero (tuple 'get-location)))
+         (dx (- (car mousetile) (car herotile)))
+         (dy (- (cdr mousetile) (cdr herotile))))
+      (cond
+         ((and (= dx 0) (< dy 0))
+            (mail 'hero (tuple 'set-orientation 0)))
+         ((and (= dx 0) (> dy 0))
+            (mail 'hero (tuple 'set-orientation 4)))
+         ((and (< dx 0) (= dy 0))
+            (mail 'hero (tuple 'set-orientation 6)))
+         ((and (> dx 0) (= dy 0))
+            (mail 'hero (tuple 'set-orientation 2)))
+
+         ((and (= dx +1) (= dy +1))
+            (mail 'hero (tuple 'set-orientation 3)))
+         ((and (= dx -1) (= dy +1))
+            (mail 'hero (tuple 'set-orientation 5)))
+         ((and (= dx -1) (= dy -1))
+            (mail 'hero (tuple 'set-orientation 7)))
+         ((and (= dx +1) (= dy -1))
+            (mail 'hero (tuple 'set-orientation 1)))
+      ))
+
+
+
    (let*((ss ms (clock))
          (i (mod (floor (/ (+ (* ss 1000) ms) (/ 1000 4))) 4)))
 
