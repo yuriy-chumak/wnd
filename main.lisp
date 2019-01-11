@@ -6,18 +6,16 @@
    (begin
       (print "будь ласка, спершу створіть героя.") (halt 1)))
 
-; (if a b c)
 
-
-; зададим конфигурацию графического окна
+; ----------------------------------
+; зададим размеры графического окна
 (define-library (lib gl config)
 (export config) (import (otus lisp))
 (begin
    (define config (list->ff `(
-      ; размеры окна в знакоместах
       ; напомню, что мы используем фиксированный шрифт размера 9*16
-      (width . ,(* 2 80 9))
-      (height . ,(* 2 16 25)))))))
+      (width  . ,(* 2  9 80))      ; 80 знакомест в ширину
+      (height . ,(* 2 16 25))))))) ; 25 знакомест в высоту
 (import (lib gl config))
 
 ; игра пошаговая! посему все ходы только после клика "я готов" (пока это ПКМ) и все НПС
@@ -31,36 +29,31 @@
 (import (otus ffi))
 (import (lib soil))
 (print "---------------")
-(gl:set-window-title "Drawing the tiled map")
+(gl:set-window-title "Wizards and Dragons")
 
+; --------------------------------------------------------------------------------------------
 ; сразу нарисуем сплеш
 (glOrtho 0 1 1 0 0 1)
 (glEnable GL_TEXTURE_2D)
-(define id ; OpenGL texture splah id
-   (SOIL_load_OGL_texture (c-string "tmp/splash.png") SOIL_LOAD_RGBA SOIL_CREATE_NEW_ID 0))
+(define id ; OpenGL texture splash ID
+   (SOIL_load_OGL_texture (c-string "common/splash.jpg") SOIL_LOAD_RGBA SOIL_CREATE_NEW_ID 0))
 (glBindTexture GL_TEXTURE_2D id)
 (glBegin GL_QUADS)
-   (glTexCoord2f 0 0)
-   (glVertex2f 0 0)
-
-   (glTexCoord2f 1 0)
-   (glVertex2f 1 0)
-
-   (glTexCoord2f 1 1)
-   (glVertex2f 1 1)
-
-   (glTexCoord2f 0 1)
-   (glVertex2f 0 1)
+   ; рисуем на весь экран квадратик с текстурой
+   (for-each (lambda (xy)
+         (glTexCoord2f (car xy) (cdr xy))
+         (glVertex2f (car xy) (cdr xy)))
+      '((0 . 0) (1 . 0) (1 . 1) (0 . 1)))
 (glEnd)
 (glDisable GL_TEXTURE_2D)
 (gl:SwapBuffers (interact 'opengl (tuple 'get 'context)))
-(glDeleteTextures 1 (list id))
+(glDeleteTextures 1 (list id)) ; и спокойно удалим сплеш текстуру
 
 ; -------------------------------------------------------
 ; теперь текстовая консолька
 (import (lib gl console))
 
-; временное окно дебага (покажем fps):
+; окно дебага (покажем fps):
 (define fps (create-window 70 24 10 1))
 (define started (time-ms)) (define time (list 0))
 (define frames '(0 . 0))
@@ -76,11 +69,12 @@
    (type GRAY (cdr frames) " fps")
 ))
 
-
+; информационное окно состояния героя
 (define info (create-window 0 1 12 24))
 (set-window-background info BLACK)
 (set-window-border info GRAY)
 (set-window-writer info (lambda (echo)
+   (move-to 0 0)
    (echo LIGHTBLUE (case (list-ref характер 1)
       (0 "Человек")
       (1 "Полуэльф")
@@ -95,194 +89,120 @@
       (else "unknown")))
 
    (move-to 0 1)
-   (echo LIGHTBLUE (case (list-ref характер 1)
-      (0 "Воїн\n")
-      (1 "Маг\n")
-      (2 "Священник\n")
-      (3 "Крадій\n")
-      (4 "Слідопит\n")
-      (5 "Паладін\n")
-      (else "unknown\n")))
+   (echo LIGHTBLUE (case (list-ref характер 2)
+      (0 "Воїн")
+      (1 "Маг")
+      (2 "Священник")
+      (3 "Крадій")
+      (4 "Слідопит")
+      (5 "Паладін")
+      (else "unknown")))
 
-   (echo LIGHTBLUE "Новобранец\n")
-   (echo WHITE "УРОВЕНЬ   1\n")
-   (echo WHITE "ОПЫТ      0\n")
+   (move-to 0 2)
+   (echo LIGHTBLUE "Новобранец")
+
+   (move-to 0 3)
+   (echo WHITE "УРОВЕНЬ   1")
+
+   (move-to 0 4)
+   (echo WHITE "ОПЫТ      0")
 ))
 
 ; ----------------
 ; музычка...
-;,load "music.lisp"
+;,load "music.lisp" ; временно отключена
 
-
+; остальные игровые библиотеки
 (import (lib math))
 (import (otus random!))
-
-; ключевые объекты игры:
-; -=( level )=-----------------
-;     заведует игровой картой
-,load "game/level.lisp"
-,load "animations.lisp"
-
-; -=( creatures )=-----------------
-;  'creatures - заведует всеми живыми(или оживленными) созданиями
-
-
-; load the model
 (import (lang sexp))
 (import (scheme misc))
 (import (file xml))
+(import (scheme dynamic-bindings))
 (import (lib rlutil))
 
-
-;(world:load-new-level "river_encampment")
-
-
-(define split-by-comma (string->regex "c/,/"))
-(define split-by-newline (string->regex "c/\n/"))
-(define (time-ms) (let*((ss ms (clock))) (+ (* ss 1000) ms)))
-
-
-; load level
-(level:load "river_encampment")
+; -=( level )=-----------------
+;     заведует игровой картой
+,load "game/level.lisp"
+;,load "animations.lisp"
 
 ,load "creature.lisp"
 ,load "ai.lisp"
-,load "animations.lisp"
+
+;;; -=( creatures )=-----------------
+;;;  'creatures - заведует всеми живыми(или оживленными) созданиями
+
+; =============================
+; 1. Загрузим игровой уровень
+(level:load "river_encampment")
 
 ; временная функция работы с level-collision
-(define collision-data (interact 'level (tuple 'get 'collision)))
-(define H (length collision-data))
-(define W (length (car collision-data)))
+(define collision-data (level:get-collisions))
 
-; internal function (temp debug purposes)
+(define H (length collision-data))       ; высота уровня
+(define W (length (car collision-data))) ; ширина уровня
+
+; временная функция: возвращает collision data
+;  по координатам x,y на карте
 (define (at x y)
    (if (and (< -1 x W) (< -1 y H))
       (lref (lref collision-data y) x)))
 
-
-
-; временная сопрограма creatures,
-; TODO: поместить ее в отдельный файл и добавить
-; функции "создать кричу, убить кричу и т.д. и т.п."
-
-
-
-; loading animations
-;(define antlion-animation (list->ff (ini-parse-file "animations/antlion.ini")))
-
-
-;; ; find first skeleton id
-(define hero_pos (cons 28 33))
-(define calculating-world (box 0))
-
-
+; =================================================================
 ; -=( hero )=---------
 (define hero 'hero)
-(define hero-destination '(51 . 61)) ; точка, куда надо идти герою
+;(define hero-destination '(51 . 61)) ; точка, куда надо идти герою
 
-(make-creature 'hero #empty) (mail 'creatures (tuple 'set 'hero hero))
-(mail hero (tuple 'set-location hero_pos))
+(make-creature hero #empty)
+; зададим позицию героя в мире
+(creature:set-location hero (cons 28 33))
 
+; зададим анимации герою, в нашем случае он будет выглядеть как скелет
 (creature:set-animations hero 'skeleton "animations/skeleton.ini")
-;;    (mail 'skeleton (tuple 'set-animations skeleton-animation firstgid)))
-;; (mail 'skeleton (tuple 'set-location hero_pos))
-
-;не, не будем задавать никакую текущую анимацию персонажу.
-(interact 'hero (tuple 'set-current-animation 'stance))
-
-;; (mail 'hero (tuple 'set 'idle (lambda (itself)
-;;    (define location (getf itself 'location))
-;;    ;(print "location: " location)
-;;    ;(print "hero-destination: " hero-destination)
-;;    (let ((move (A* collision-data
-;;                   (car location) (cdr location)
-;;                   (car hero-destination) (cdr hero-destination))))
-;;       ;(print "move: " move)
-;;       (if move
-;;          (creature:move itself (cons (ref move 1) (ref move 2)))
-;;          itself)))))
+(creature:set-current-animation hero 'stance) ; и пускай он просто стоит
 
 
-; TEMP
-;; ; spawn skeleton
-;; (make-creature 'skeleton)
-;; (let*((tilesets (filter (lambda (tag) (string-eq? (xml-get-attribute tag 'name "") "skeleton")) tilesets))
-;;       (firstgid (string->number (xml-get-attribute (car tilesets) 'firstgid 0) 10)))
-;;    (mail 'skeleton (tuple 'set-animations skeleton-animation firstgid)))
-;; (mail 'skeleton (tuple 'set-location hero_pos))
-;; (mail 'skeleton (tuple 'set-current-animation 'run))
-
-;; (define skeleton (filter (lambda (tag) (string-eq? (xml-get-attribute tag 'name "") "skeleton")) tilesets))
-;; (define firstgid (string->number (xml-get-attribute (car skeleton) 'firstgid 0) 10))
-
-; -=( skeletons )=-----------------
+; -=( mobs )=-----------------
 ;,load "mob.lisp" ; стейт-машина скелета, в этом файле записано его поведение
 
-(define skeletons (iota 10 1000)) ; 6 скелетонов, начиная с номера 1000 (пускай скелетоны будут номерные)
+(define monsters (iota 10 1000)) ; 10 монстров, начиная с номера 1000 (пускай мобы будут номерные)
 (for-each (lambda (id)
       (make-creature id #empty)) ; создаем их
-   skeletons)
-(mail 'creatures (tuple 'set 'skeletons skeletons)) ; и сохраним в списке всех npc
+   monsters)
+(mail 'creatures (tuple 'set 'monsters monsters)) ; и сохраним в списке всех npc
 
-; теперь поместим скелетонов в случайные места на карте
+; теперь поместим монстров в случайные места на карте
 (for-each (lambda (id)
       ; поиск свободного места
       (let loop ()
-         (let ((x (rand! 64))
-               (y (rand! 64)))
+         (let ((x (rand! W))
+               (y (rand! H)))
             (if (eq? 0 (at x y))
                (begin
-                  (mail id (tuple 'set-location (cons x y)))
-                  (mail id (tuple 'set-orientation (rand! 8))))
+                  (creature:set-location id (cons x y))
+                  (creature:set-orientation id (rand! 8))
+
+                  (creature:set-animations id 'goblin "animations/goblin.ini")
+                  (creature:set-current-animation id 'stance))
                (loop)))))
-   skeletons)
+   monsters)
 
-; зададим скелетонам машину состояний и пусть все пока спят
-(for-each (lambda (id)
-      (mail id (tuple 'set 'state-machine default-mob-state-machine))) ; state machine
-   skeletons)
-; set initial state
-(for-each (lambda (id)
-      (mail id (tuple 'set 'state 'sleeping))) ; initial state
-   skeletons)
-
-
-(for-each (lambda (id)
-      (creature:set-animations id 'goblin "animations/goblin.ini")
-      (creature:set-current-animation id 'stance))
-   skeletons)
-
-; а давайте-ка пометим на карту сундук? вместо героя
-; и пускай этот сундук сразу телепортируется в новое место,
-; как только его кто-то нашел?
-(make-creature 'chest #empty)
-
-(let loop ()
-   (let ((x (rand! 64))
-         (y (rand! 64)))
-      (if (eq? 0 (at x y))
-         (mail 'chest (tuple 'set-location (cons x y)))
-         (loop))))
-; и добавим к общему списку нипов:
-(mail 'creatures (tuple 'set 'chest 'chest))
-
-
+;; ; зададим скелетонам машину состояний и пусть все пока спят
+;; (for-each (lambda (id)
+;;       (mail id (tuple 'set 'state-machine default-mob-state-machine))) ; state machine
+;;    monsters)
+;; ; set initial state
+;; (for-each (lambda (id)
+;;       (mail id (tuple 'set 'state 'sleeping))) ; initial state
+;;    monsters)
 
 ; --------------------------------------------------------------------
-; x11 mouse:
-;; (define X11 (load-dynamic-library "libX11.so.6"))
-;; (define XQueryPointer (X11 fft-int "XQueryPointer" fft-void* fft-void* fft-void* fft-void*
-;;    (fft& fft-int) (fft& fft-int)
-;;    (fft& fft-int) (fft& fft-int)
-;;    (fft& fft-unsigned-int)))
-
-; --------------------------------------------------------------------
-; view window
+; окно, через которое мы смотрим на мир
 
 ;              x-left             x-right y-left         y-right
 ;(define window (vector (+ -32 -800) -32 (+ 3645 32 -800) (+ 2048 32)))
 (define window (vector -1920 -64 1920 (- 2160 64)))
-(define (resize scale)
+(define (resize scale) ; изменение масштаба
    (let*((x (floor (/ (+ (ref window 3) (ref window 1)) 2)))
          (w (floor (* (- (ref window 3) (ref window 1)) (/ scale 2))))
          (y (floor (/ (+ (ref window 4) (ref window 2)) 2)))
@@ -291,14 +211,15 @@
       (set-ref! window 2 (- y h))
       (set-ref! window 3 (+ x w))
       (set-ref! window 4 (+ y h))))
-(define (move dx dy)(let*((x (floor (* (- (ref window 3) (ref window 1)) 0.01)))
+(define (move dx dy) ; сдвинуть окно
+   (let*((x (floor (* (- (ref window 3) (ref window 1)) 0.01)))
          (y (floor (* (- (ref window 4) (ref window 2)) 0.01))))
       (set-ref! window 1 (+ (ref window 1) (* dx x)))
       (set-ref! window 2 (- (ref window 2) (* dy y)))
       (set-ref! window 3 (+ (ref window 3) (* dx x)))
       (set-ref! window 4 (- (ref window 4) (* dy y)))))
 
-
+; функция перевода экранных координат в номер тайла, на который они попадают
 (define (xy:screen->tile xy)
    (let ((x1 (ref window 1)) (x2 (ref window 3))
          (y1 (ref window 2)) (y2 (ref window 4)))
@@ -310,47 +231,47 @@
          (h (interact 'level (tuple 'get 'tileheight))))
    (let ((x (+ (/ X w) (/ Y h)))
          (y (- (/ Y h) (/ X w))))
-         ;; (print "x: " (inexact x))
-         ;; (print "y: " (inexact y))
       (cons (floor x) (floor y))))))))
 
+(resize 1/3) ; временно: увеличим карту в 3 раза
 
 ; init
 (glShadeModel GL_SMOOTH)
 (glBlendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA)
-
 (gl:hide-cursor)
-(resize 1/3)
 
+; служебные переменные
 (define timestamp (box 0))
+(define calculating-world (box 0))
+
 ; draw
 (gl:set-renderer (lambda (mouse)
+   ; тут мы поворачиваем нашего шероя в сторону мышки
    (let*((mousetile (xy:screen->tile mouse))
-         (herotile (interact 'hero (tuple 'get-location)))
+         (herotile (creature:get-location 'hero))
          (dx (- (car mousetile) (car herotile)))
          (dy (- (cdr mousetile) (cdr herotile))))
       (cond
          ((and (= dx 0) (< dy 0))
-            (mail 'hero (tuple 'set-orientation 0)))
+            (creature:set-orientation 'hero 0))
          ((and (= dx 0) (> dy 0))
-            (mail 'hero (tuple 'set-orientation 4)))
+            (creature:set-orientation 'hero 4))
          ((and (< dx 0) (= dy 0))
-            (mail 'hero (tuple 'set-orientation 6)))
+            (creature:set-orientation 'hero 6))
          ((and (> dx 0) (= dy 0))
-            (mail 'hero (tuple 'set-orientation 2)))
+            (creature:set-orientation 'hero 2))
 
          ((and (= dx +1) (= dy +1))
-            (mail 'hero (tuple 'set-orientation 3)))
+            (creature:set-orientation 'hero 3))
          ((and (= dx -1) (= dy +1))
-            (mail 'hero (tuple 'set-orientation 5)))
+            (creature:set-orientation 'hero 5))
          ((and (= dx -1) (= dy -1))
-            (mail 'hero (tuple 'set-orientation 7)))
+            (creature:set-orientation 'hero 7))
          ((and (= dx +1) (= dy -1))
-            (mail 'hero (tuple 'set-orientation 1)))
+            (creature:set-orientation 'hero 1))
       ))
 
-
-
+   ; просто регулярные действия
    (let*((ss ms (clock))
          (i (mod (floor (/ (+ (* ss 1000) ms) (/ 1000 4))) 4)))
 
@@ -367,29 +288,7 @@
             ;;    (interact 'creatures (tuple 'get 'skeletons)))
          )))
 
-      ;;       ; и герою тоже пошлем сообщение
-      ;;       ;(mail 'hero (tuple 'idle))
-
-      ;;       ;; ; maybe move chest
-      ;;       ;; (for-each (lambda (id)
-      ;;       ;;       (define pos (interact id (tuple 'get-location)))
-
-      ;;       ;;       (if (equal? pos destination)
-      ;;       ;;          (let loop ()
-      ;;       ;;             (let ((x (rand! 64))
-      ;;       ;;                   (y (rand! 64)))
-      ;;       ;;                (if (eq? 0 (at x y))
-      ;;       ;;                   (begin
-      ;;       ;;                      (set-car! destination x)
-      ;;       ;;                      (set-cdr! destination y))
-      ;;       ;;                   (loop))))))
-      ;;       ;;    skeletons)
-      ;;    )))
-
-   ; убедимся, что ВСЕ npc готовы к отображению
-   ;(interact 'creatures (tuple 'ready?))
-
-   ; drawing
+   ; теперь можем и порисовать: очистим окно и подготовим оконную математику
    (glClearColor 0.0 0.0 0.0 1)
    (glClear GL_COLOR_BUFFER_BIT)
    (glLoadIdentity)
@@ -397,8 +296,8 @@
    (glEnable GL_TEXTURE_2D)
    (glEnable GL_BLEND)
 
-   ; попросим уровень отрисовать себя
-   (interact 'level (tuple 'draw (if mouse (xy:screen->tile mouse)))) ; (level:draw)
+   ; теперь попросим уровень отрисовать себя
+   (level:draw (if mouse (xy:screen->tile mouse)))
 
    ; окошки, консолька, etc.
    (render-windows)
@@ -410,6 +309,7 @@
                (if (eq? (unbox calculating-world) 0)
                   (+ 1212 ms)
                   (+ 1292 ms))))
+            (w (/ (- (ref window 3) (ref window 1)) 48)) ;  размер курсора
             (st (ref tile 5))
             ; window mouse to opengl mouse:
             (x (+ (ref window 1) (* (car mouse) (- (ref window 3) (ref window 1)) (/ 1 screen-width))))
@@ -422,13 +322,13 @@
             (glVertex2f x y)
 
             (glTexCoord2f (ref st 3) (ref st 2))
-            (glVertex2f (+ x 64) y)
+            (glVertex2f (+ x w) y)
 
             (glTexCoord2f (ref st 3) (ref st 4))
-            (glVertex2f (+ x 64) (+ y 64))
+            (glVertex2f (+ x w) (+ y w))
 
             (glTexCoord2f (ref st 1) (ref st 4))
-            (glVertex2f x (+ y 64))
+            (glVertex2f x (+ y w))
          (glEnd)))
 
 
@@ -499,13 +399,10 @@
    (print "mouse: " button " (" x ", " y ")")
    (if (eq? (unbox calculating-world) 0) ; если мир сейчас не просчитывается (todo: оформить отдельной функцией)
       (cond
-         ((eq? button 1)
-            ; tile - tile-under-attack
-            (let ((tile (xy:screen->tile (cons x y))))
-               (begin
-                  (set-car! calculating-world 42)
-                  (mail 'game (tuple 'fire-in-the-tile tile))))
-            #true)
+         ;; ((eq? button 1)
+         ;;    (let ((tile (xy:screen->tile (cons x y))))
+         ;;       (set-car! calculating-world 42)
+         ;;       (mail 'game (tuple 'run tile))))
          ((eq? button 3) ; ПКМ
             (if (eq? (unbox calculating-world) 0) ; если мир сейчас не просчитывается (todo: оформить отдельной функцией)
                (begin
@@ -548,6 +445,16 @@
                (interact 'creatures (tuple 'get 'skeletons)))
             (set-car! calculating-world 0)
             (this itself))
+
+         ;; ((run to)
+         ;;    (let*((hero (creature:get-location 'hero))
+         ;;          (move (A* collision-data (car hero) (cdr hero) (car to) (cdr to))))
+         ;;       (if move (begin
+         ;;          (creature:play-animation 'hero 'run #f)
+         ;;          (creature:set-location 'hero (cons (+ (car hero) (car move))
+         ;;                                          (+ (cdr hero) (cdr move)))))))
+         ;;    (set-car! calculating-world 0)
+         ;;    (this itself))
          (else
             (print "logic: unhandled event: " msg)
             (this itself)))))))

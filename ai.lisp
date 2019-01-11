@@ -22,12 +22,12 @@
                (by-y (- y 1) (cdr map)))))))))
 
    (if (and (= from-x to-x) (= from-y to-y)) ; уже пришли
-      (tuple 0 0 #empty #empty)
+      #false ;(tuple 0 0 #empty #empty)
    (let step1 ((n 999); количество шагов поиска
                (c-list-set #empty)
                (o-list-set (put #empty (hash xy)  (tuple xy #f  0 0 0))))
       (if (eq? o-list-set #empty)
-         (tuple 0 0 #empty #empty) ; некуда идти - постоим
+         #false ;(tuple 0 0 #empty #empty) ; некуда идти - постоим
 
       ; найдем клетку с минимальной стоимостью:
       (let*((f (ff-fold (lambda (s key value)
@@ -52,11 +52,11 @@
                (let*((parent (ref (get c-list-set (hash xy) #f) 2)) ; todo: переделать
                      (parent-of-parent (ref (get c-list-set (hash parent) #f) 2)))
                   (if parent-of-parent (rev parent)
-                     (tuple
+                     (cons ;(tuple
                         (- (car xy) (car parent))
                         (- (cdr xy) (cdr parent))
-                        c-list-set
-                        o-list-set
+                        ;c-list-set
+                        ;o-list-set
                         ))))
 
             ; 5: Проверяем все соседние клетки.
@@ -130,9 +130,9 @@
          ((eq? damage 0) ; если нету урона, ничего не делаем
             #false)
          ((> life 0) ; пока живые, рисуем "хит" (или можем ничего не рисовать)
-            (play-animation creature 'swing #f))
+            (creature:play-animation creature 'swing #f))
          ((<= life 0)
-            (play-animation creature 'die 'die) ; умираем, переходим в состояние "умерли"
+            (creature:play-animation creature 'die 'die) ; умираем, переходим в состояние "умерли"
             'dead))))
 
 ; машина состояний
@@ -148,7 +148,7 @@
             (if (> sound-level 60)
                (begin
                   ; проиграть анимацию "встаю" (эта функция выйдет после того, как анимация закончится)
-                  (play-animation creature 'swing #f)
+                  (creature:play-animation creature 'swing #f)
                   ; перейти в режим преследования, иначе спим дальше
                   'pursuit))))
 

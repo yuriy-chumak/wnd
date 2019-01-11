@@ -4,15 +4,30 @@
 (import (scheme misc))
 (import (only (lang intern) string->symbol))
 
-; public interface
+; public interface:
+
+; загрузить уровень
 (define (level:load filename)
    (interact 'level (tuple 'load filename)))
 
+; попросить у уровня "background" слой
+;  возвращает список списков с номерами тайлов
 (define (level:get-background)
    (interact 'level (tuple 'get 'background-data)))
+;  возвращает слой "collision"
+(define (level:get-collisions)
+   (interact 'level (tuple 'get 'collision-data)))
 
+; возвращает первый номер тайла, ассоциированный с тайлсетом name
 (define (level:get-gid name)
    (getf (interact 'level (tuple 'get 'gids)) name))
+; возвращает количество тайлов в одной строке тайлсета name
+(define (level:get-columns name)
+   (getf (interact 'level (tuple 'get 'columns)) name))
+
+; нарисовать уровень
+(define (level:draw mouse)
+   (interact 'level (tuple 'draw mouse)))
 
 
 ; -----------------------------------------------
@@ -68,7 +83,6 @@
                         (string->symbol (xml-get-attribute tileset 'name "noname"))
                         (string->number (xml-get-attribute tileset 'columns 0) 10)))
                   tilesets)))
-               (print "columns: " columns)
 
                ; make ff (id > tileset element)
                (define tileset
@@ -172,7 +186,7 @@
                   (tileset . ,tileset)
                   (background-data . ,background-data)
                   (object-data . ,object-data)
-                  (collision . ,collision-data)))))
+                  (collision-data . ,collision-data)))))
 
             ; draw the level on the screen
             ((draw); interact
@@ -247,19 +261,13 @@
                   ;   рисовать мы их будем все вместе - слой "object" и наших creatures
 
                   ; список NPC:
-                  (define creatures '())#|(map (lambda (id)
+                  (define creatures (map (lambda (id)
                         (tuple (interact id (tuple 'get-location)) (interact id (tuple 'get-animation-frame))))
-                     (interact 'creatures (tuple 'get 'skeletons))))|#
+                     (interact 'creatures (tuple 'get 'monsters))))
 
                   (draw-layer object-data (append creatures (list
-                     ; (tuple destination 552) ; временно - сундук
                      (tuple (interact 'hero (tuple 'get-location))
                             (interact 'hero (tuple 'get-animation-frame)))
-
-                     ;(tuple (interact 'chest (tuple 'get-location)) 552)
-                     ; хорошо бы сюда еще игрока добавить... но его рисовать сложнее, так что пока отложим
-                     ; временно пусть это будет зомби ))
-                     ;(tuple (interact 'hero (tuple 'get-location)) (interact 'hero (tuple 'get-animation-frame)))
                   )))
 
                   (mail sender 'ok)

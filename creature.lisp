@@ -1,16 +1,23 @@
 (import (file ini))
 (import (scheme misc))
 
+; поместить создание на карту
+(define (creature:set-location creature location)
+   (mail creature (tuple 'set-location location)))
+
+(define (creature:set-orientation creature orientation)
+   (mail creature (tuple 'set-orientation orientation)))
+
 ; задать созданию набор анимаций (тайлсет, конфигурационный файл)
 (define (creature:set-animations creature name inifile)
    (mail creature (tuple 'set-animations name inifile)))
 
-; выбрать персонажу текущую анимацию по ее имени
+; выбрать созданию текущую анимацию по ее имени
 (define (creature:set-current-animation creature animation)
    (interact creature (tuple 'set-current-animation animation)))
 
 ; отыграть цикл анимации (с ожиданием)
-(define (play-animation creature animation next-animation) ; returns #false
+(define (creature:play-animation creature animation next-animation) ; returns #false
    (let ((started (time-ms))
          (saved-animation (or next-animation (interact creature (tuple 'get 'animation))))
          (duration (creature:set-current-animation creature animation)))
@@ -22,6 +29,10 @@
          ; set next animation or restore saved
          (creature:set-current-animation creature saved-animation)))
    #false)
+
+; получить положение создания
+(define (creature:get-location creature)
+   (interact creature (tuple 'get-location)))
 
 
 ; содержит список крич, где 0..N - npc, ну или по имени (например, 'hero - герой)
@@ -76,7 +87,9 @@
    (7 . 2)))) ;left-top
 (define speed 64) ; 1 tile per second
 
+; ----------------------------------
 ; todo: make automatic id generation
+; создать новое "создание"
 (define (make-creature name initial)
    (fork-server name (lambda ()
    (let this ((itself initial))
@@ -99,10 +112,9 @@
          ; set animation
          ;  задать имя тайловой карты и конфигурационный файл анимаций персонажа
          ((set-animations name ini)
-            (let*((itself (put itself 'fg (getf (interact 'level (tuple 'get 'gids)) name)))
+            (let*((itself (put itself 'fg (level:get-gid name)))
                   (itself (put itself 'animations (list->ff (ini-parse-file ini))))
-                  (itself (put itself 'columns (getf (interact 'level (tuple 'get 'columns)) name))))
-               (print name ": " itself)
+                  (itself (put itself 'columns (level:get-columns name))))
                (this itself)))
 
          ((set-current-animation animation)
