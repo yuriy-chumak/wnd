@@ -245,7 +245,11 @@
                                                    (if (and
                                                          (eq? (car (ref entity 1)) i)
                                                          (eq? (cdr (ref entity 1)) j))
-                                                      (draw-tile (ref entity 2) i j)))
+                                                      (let ((tile (ref entity 2)))
+                                                      (draw-tile
+                                                         (car tile)
+                                                         (unless (cdr tile) i (+ i (cadr tile)))
+                                                         (unless (cdr tile) j (+ j (cddr tile)))))))
                                                 entities)))
                               line
                               (iota (length line))))

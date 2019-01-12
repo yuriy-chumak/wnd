@@ -4,7 +4,11 @@
 ; поместить создание на карту
 (define (creature:set-location creature location)
    (mail creature (tuple 'set-location location)))
+; получить положение создания
+(define (creature:get-location creature)
+   (interact creature (tuple 'get-location)))
 
+; задать поворот в пространстве
 (define (creature:set-orientation creature orientation)
    (mail creature (tuple 'set-orientation orientation)))
 
@@ -15,6 +19,9 @@
 ; выбрать созданию текущую анимацию по ее имени
 (define (creature:set-current-animation creature animation)
    (interact creature (tuple 'set-current-animation animation)))
+
+(define (creature:set-next-location creature location)
+   (mail creature (tuple 'set-next-location location)))
 
 ; отыграть цикл анимации (с ожиданием)
 (define (creature:play-animation creature animation next-animation) ; returns #false
@@ -27,13 +34,27 @@
             (loop (sleep 7))))
       (unless (eq? saved-animation animation)
          ; set next animation or restore saved
-         (creature:set-current-animation creature saved-animation)))
-   #false)
+         (creature:set-current-animation creature saved-animation))))
 
-; получить положение создания
-(define (creature:get-location creature)
-   (interact creature (tuple 'get-location)))
+; двигаться (с анимацией)
+(define (creature:move-with-animation creature move animation next-animation) ; returns #false
+   (let ((started (time-ms))
+         (saved-animation (or next-animation (interact creature (tuple 'get 'animation))))
+         (location (creature:get-location creature))
+         (duration (creature:set-current-animation creature animation)))
+      (creature:set-next-location creature move)
+      (let loop ((unused #f))
+         ;(print creature ": waiting for " (- (time-ms) started))
+         (if (< (- (time-ms) started) duration)
+            (loop (sleep 7))))
+      (creature:set-next-location creature #f)
+      (creature:set-location creature
+         (cons (+ (car location) (car move))
+               (+ (cdr location) (cdr move))))
 
+      (unless (eq? saved-animation animation)
+         ; set next animation or restore saved
+         (creature:set-current-animation creature saved-animation))))
 
 ; содержит список крич, где 0..N - npc, ну или по имени (например, 'hero - герой)
 (fork-server 'creatures (lambda ()
@@ -146,6 +167,7 @@
             (let*((animation (get itself 'animation 'stance)) ; соответствующая состояния анимация
                   (ssms (- (time-ms) (get itself 'ssms 0))) ; количество ms с момента перехода в анимацию
                   (columns (get itself 'columns 32))
+                  (delta (getf itself 'next-location))
                   (animations (get itself 'animations #empty))
                   (animation (get animations animation #empty))
                   (animation-type (get animation 'type #false))
@@ -167,21 +189,32 @@
                   (position (get animation 'position "4"))
                   (position (string->number position 10))
                   (orientation (get itself 'orientation 0))
-                  (frame (floor (/ (* ssms frames) duration))))
-               (mail sender (+ (get itself 'fg 0) position
-                  (cond
+                  (frame (floor (/ (* ssms frames) duration)))
+                  (frame (cond
                      ((string-eq? animation-type "play_once")
                         (min (- frames 1) frame))
                      ((string-eq? animation-type "looped")
                         (mod frame frames))
                      ((string-eq? animation-type "back_forth")
-                        (lref (append (iota frames) (reverse (iota (- frames 2) 1))) (mod frame (+ frames frames -2)))))
-                  (* columns (get orientations orientation 0)))))
+                        (lref (append (iota frames) (reverse (iota (- frames 2) 1))) (mod frame (+ frames frames -2))))))
+                  (_ (if delta (print delta)))
+                  (delta (if delta (let ((n (if (string-eq? animation-type "back_forth")
+                                                (+ frames frames -1)
+                                                frames)))
+                     (cons (* frame (/ (car delta) n))
+                           (* frame (/ (cdr delta) n)))))))
+               (mail sender (cons (+ (get itself 'fg 0) position
+                  frame
+                  (* columns (get orientations orientation 0)))
+                  delta)))
             (this itself))
 
          ; ---------------------------------------------
          ((set-location xy)
             (let*((itself (put itself 'location xy)))
+               (this itself)))
+         ((set-next-location xy)
+            (let*((itself (put itself 'next-location xy)))
                (this itself)))
          ((set-orientation orientation)
             (let*((itself (put itself 'orientation orientation)))

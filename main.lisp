@@ -20,8 +20,8 @@
 
 ; игра пошаговая! посему все ходы только после клика "я готов" (пока это ПКМ) и все НПС
 ; должны ходить по-очереди. при этом демонстрировать что они делают.
-(define screen-width (getf config 'width))
-(define screen-height (getf config 'height))
+(define screen-width (config 'width))
+(define screen-height (config 'height))
 
 ; -=( main )=------------------------------------
 ; подключаем графические библиотеки, создаем окно
@@ -55,10 +55,10 @@
 
 ; окно дебага (покажем fps):
 (define fps (create-window 70 24 10 1))
-(define started (time-ms)) (define time (list 0))
+(define started (time-ms)) (define time '(0))
 (define frames '(0 . 0))
 
-(set-window-writer fps (lambda (type)
+(set-window-writer fps (lambda (print)
    (set-car! frames (+ (car frames) 1))
    (let ((now (time-ms)))
       (if (> now (+ started (car time) 1000))
@@ -66,7 +66,7 @@
             (set-cdr! frames (car frames))
             (set-car! frames 0)
             (set-car! time (- now started)))))
-   (type GRAY (cdr frames) " fps")
+   (print GRAY (cdr frames) " fps")
 ))
 
 ; информационное окно состояния героя
@@ -150,7 +150,7 @@
 
 ; =================================================================
 ; -=( hero )=---------
-(define hero 'hero)
+(define hero 'hero) ;(list->ff '((0 . 0) (1 . 1)))) ;'hero)
 ;(define hero-destination '(51 . 61)) ; точка, куда надо идти герою
 
 (make-creature hero #empty)
@@ -242,34 +242,35 @@
 
 ; служебные переменные
 (define timestamp (box 0))
-(define calculating-world (box 0))
+(define calculating-world (box #false))
 
 ; draw
 (gl:set-renderer (lambda (mouse)
    ; тут мы поворачиваем нашего шероя в сторону мышки
-   (let*((mousetile (xy:screen->tile mouse))
-         (herotile (creature:get-location 'hero))
-         (dx (- (car mousetile) (car herotile)))
-         (dy (- (cdr mousetile) (cdr herotile))))
-      (cond
-         ((and (= dx 0) (< dy 0))
-            (creature:set-orientation 'hero 0))
-         ((and (= dx 0) (> dy 0))
-            (creature:set-orientation 'hero 4))
-         ((and (< dx 0) (= dy 0))
-            (creature:set-orientation 'hero 6))
-         ((and (> dx 0) (= dy 0))
-            (creature:set-orientation 'hero 2))
+   (unless (unbox calculating-world)
+      (let*((mousetile (xy:screen->tile mouse))
+            (herotile (creature:get-location 'hero))
+            (dx (- (car mousetile) (car herotile)))
+            (dy (- (cdr mousetile) (cdr herotile))))
+         (cond
+            ((and (= dx 0) (< dy 0))
+               (creature:set-orientation 'hero 0))
+            ((and (= dx 0) (> dy 0))
+               (creature:set-orientation 'hero 4))
+            ((and (< dx 0) (= dy 0))
+               (creature:set-orientation 'hero 6))
+            ((and (> dx 0) (= dy 0))
+               (creature:set-orientation 'hero 2))
 
-         ((and (= dx +1) (= dy +1))
-            (creature:set-orientation 'hero 3))
-         ((and (= dx -1) (= dy +1))
-            (creature:set-orientation 'hero 5))
-         ((and (= dx -1) (= dy -1))
-            (creature:set-orientation 'hero 7))
-         ((and (= dx +1) (= dy -1))
-            (creature:set-orientation 'hero 1))
-      ))
+            ((and (= dx +1) (= dy +1))
+               (creature:set-orientation 'hero 3))
+            ((and (= dx -1) (= dy +1))
+               (creature:set-orientation 'hero 5))
+            ((and (= dx -1) (= dy -1))
+               (creature:set-orientation 'hero 7))
+            ((and (= dx +1) (= dy -1))
+               (creature:set-orientation 'hero 1))
+         )))
 
    ; просто регулярные действия
    (let*((ss ms (clock))
@@ -306,7 +307,7 @@
    (if mouse
       (let*((ms (mod (floor (/ (time-ms) 100)) 40))
             (tile (getf (interact 'level (tuple 'get 'tileset))
-               (if (eq? (unbox calculating-world) 0)
+               (unless (unbox calculating-world)
                   (+ 1212 ms)
                   (+ 1292 ms))))
             (w (/ (- (ref window 3) (ref window 1)) 48)) ;  размер курсора
@@ -397,14 +398,14 @@
 
 (gl:set-mouse-handler (lambda (button x y)
    (print "mouse: " button " (" x ", " y ")")
-   (if (eq? (unbox calculating-world) 0) ; если мир сейчас не просчитывается (todo: оформить отдельной функцией)
+   (unless (unbox calculating-world) ; если мир сейчас не просчитывается (todo: оформить отдельной функцией)
       (cond
-         ;; ((eq? button 1)
-         ;;    (let ((tile (xy:screen->tile (cons x y))))
-         ;;       (set-car! calculating-world 42)
-         ;;       (mail 'game (tuple 'run tile))))
+         ((eq? button 1)
+            (let ((tile (xy:screen->tile (cons x y))))
+               (set-car! calculating-world 42)
+               (mail 'game (tuple 'run tile))))
          ((eq? button 3) ; ПКМ
-            (if (eq? (unbox calculating-world) 0) ; если мир сейчас не просчитывается (todo: оформить отдельной функцией)
+            (unless (unbox calculating-world) ; если мир сейчас не просчитывается (todo: оформить отдельной функцией)
                (begin
                   (set-car! calculating-world 42)
                   (mail 'game (tuple 'turn)))))
@@ -435,7 +436,7 @@
             (print "turn done.")
 
             ; вроде все обработали, можно переходить в состояние "готов к следующему ходу"
-            (set-car! calculating-world 0)
+            (set-car! calculating-world #false)
             (this itself))
          ((fire-in-the-tile xy)
             (for-each (lambda (creature)
@@ -443,18 +444,27 @@
                   (if (equal? (interact creature (tuple 'get 'location)) xy)
                      (ai:make-action creature 'damage 50)))
                (interact 'creatures (tuple 'get 'skeletons)))
-            (set-car! calculating-world 0)
+            (set-car! calculating-world #false)
             (this itself))
 
-         ;; ((run to)
-         ;;    (let*((hero (creature:get-location 'hero))
-         ;;          (move (A* collision-data (car hero) (cdr hero) (car to) (cdr to))))
-         ;;       (if move (begin
-         ;;          (creature:play-animation 'hero 'run #f)
-         ;;          (creature:set-location 'hero (cons (+ (car hero) (car move))
-         ;;                                          (+ (cdr hero) (cdr move)))))))
-         ;;    (set-car! calculating-world 0)
-         ;;    (this itself))
+         ((run to)
+            (let*((hero (creature:get-location 'hero))
+                  (move (A* collision-data (car hero) (cdr hero) (car to) (cdr to))))
+               (if move (begin
+                  ; повернем героя в ту сторону, куда он собрался идти
+                  (cond
+                     ((equal? move '(0 . -1))
+                        (creature:set-orientation 'hero 0))
+                     ((equal? move '(+1 . 0))
+                        (creature:set-orientation 'hero 2))
+                     ((equal? move '(0 . +1))
+                        (creature:set-orientation 'hero 4))
+                     ((equal? move '(-1 . 0))
+                        (creature:set-orientation 'hero 6)))
+                  ; и пошлем его в дорогу
+                  (creature:move-with-animation 'hero move 'run #f))))
+            (set-car! calculating-world #false)
+            (this itself))
          (else
             (print "logic: unhandled event: " msg)
             (this itself)))))))
