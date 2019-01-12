@@ -393,8 +393,8 @@
    (print "key: " key)
    (case key
       (#x18
-         (mail 'music (tuple 'shutdown))
-         (shutdown 1))))) ; q - quit
+         ;(mail 'music (tuple 'shutdown))
+         (halt 1))))) ; q - quit
 
 (gl:set-mouse-handler (lambda (button x y)
    (print "mouse: " button " (" x ", " y ")")
@@ -448,21 +448,24 @@
             (this itself))
 
          ((run to)
-            (let*((hero (creature:get-location 'hero))
-                  (move (A* collision-data (car hero) (cdr hero) (car to) (cdr to))))
-               (if move (begin
-                  ; повернем героя в ту сторону, куда он собрался идти
-                  (cond
-                     ((equal? move '(0 . -1))
-                        (creature:set-orientation 'hero 0))
-                     ((equal? move '(+1 . 0))
-                        (creature:set-orientation 'hero 2))
-                     ((equal? move '(0 . +1))
-                        (creature:set-orientation 'hero 4))
-                     ((equal? move '(-1 . 0))
-                        (creature:set-orientation 'hero 6)))
-                  ; и пошлем его в дорогу
-                  (creature:move-with-animation 'hero move 'run #f))))
+            (let loop ()
+               (let*((hero (creature:get-location 'hero))
+                     (move (A* collision-data (car hero) (cdr hero) (car to) (cdr to))))
+                  (if move (begin
+                     ; повернем героя в ту сторону, куда он собрался идти
+                     (cond
+                        ((equal? move '(0 . -1))
+                           (creature:set-orientation 'hero 0))
+                        ((equal? move '(+1 . 0))
+                           (creature:set-orientation 'hero 2))
+                        ((equal? move '(0 . +1))
+                           (creature:set-orientation 'hero 4))
+                        ((equal? move '(-1 . 0))
+                           (creature:set-orientation 'hero 6)))
+                     ; и пошлем его в дорогу
+                     (creature:move-with-animation 'hero move 'run #f)
+                     (unless (equal? (creature:get-location 'hero) to)
+                        (loop))))))
             (set-car! calculating-world #false)
             (this itself))
          (else

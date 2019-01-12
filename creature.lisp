@@ -47,8 +47,8 @@
          ;(print creature ": waiting for " (- (time-ms) started))
          (if (< (- (time-ms) started) duration)
             (loop (sleep 7))))
-      (creature:set-next-location creature #f)
-      (creature:set-location creature
+      ;(creature:set-next-location creature #f)
+      (creature:set-location creature ; setting location automatically clears next-location
          (cons (+ (car location) (car move))
                (+ (cdr location) (cdr move))))
 
@@ -197,7 +197,6 @@
                         (mod frame frames))
                      ((string-eq? animation-type "back_forth")
                         (lref (append (iota frames) (reverse (iota (- frames 2) 1))) (mod frame (+ frames frames -2))))))
-                  (_ (if delta (print delta)))
                   (delta (if delta (let ((n (if (string-eq? animation-type "back_forth")
                                                 (+ frames frames -1)
                                                 frames)))
@@ -211,7 +210,8 @@
 
          ; ---------------------------------------------
          ((set-location xy)
-            (let*((itself (put itself 'location xy)))
+            (let*((itself (put itself 'location xy))
+                  (itself (del itself 'next-location)))
                (this itself)))
          ((set-next-location xy)
             (let*((itself (put itself 'next-location xy)))
