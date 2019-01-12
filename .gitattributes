@@ -1,0 +1,3 @@
+*.scm text linguist-language=Ol
+*.scm.ok text eol=lf
+*.lisp text linguist-language=Ol
