@@ -150,16 +150,14 @@
 
 ; =================================================================
 ; -=( hero )=---------
-(define hero 'hero) ;(list->ff '((0 . 0) (1 . 1)))) ;'hero)
-;(define hero-destination '(51 . 61)) ; точка, куда надо идти герою
-
-(make-creature hero #empty)
+(define hero (make-creature 'hero #empty))
 ; зададим позицию героя в мире
-(creature:set-location hero (cons 28 33))
+(creature:set-location 'hero (cons 28 33)) ; старый способ перемещения героя
+((hero 'set-location) (cons 28 33))        ; новый способ перемещения героя - выбрать какой лучше
 
 ; зададим анимации герою, в нашем случае он будет выглядеть как скелет
-(creature:set-animations hero 'skeleton "animations/skeleton.ini")
-(creature:set-current-animation hero 'stance) ; и пускай он просто стоит
+(creature:set-animations 'hero 'skeleton "animations/skeleton.ini")
+(creature:set-current-animation 'hero 'stance) ; пусть он просто стоит
 
 
 ; -=( mobs )=-----------------

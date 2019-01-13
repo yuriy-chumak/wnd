@@ -271,7 +271,15 @@
 
          (else
             (print "unhandled event: " msg)
-            (this itself))))))))
+            (this itself)))))))
+   (list->ff (list
+      (cons 'set-location (lambda (location)
+         (creature:set-location name location)))
+      (cons 'get-location (lambda ()
+         (creature:get-location name)))
+      (cons 'set-orientation (lambda (orientation)
+         (creature:set-orientation name orientation)))
+      )))
 
 ; набор функций - работы с НИП
 ;; (define (creature:send-event creature event . args)
