@@ -197,7 +197,7 @@
 ; --------------------------------------------------------------------
 ; окно, через которое мы смотрим на мир
 
-;              x-left             x-right y-left         y-right
+;              x-left         y-left    x-right          y-right
 ;(define window (vector (+ -32 -800) -32 (+ 3645 32 -800) (+ 2048 32)))
 (define window (vector -1920 -64 1920 (- 2160 64)))
 (define (resize scale) ; изменение масштаба
@@ -231,7 +231,7 @@
          (y (- (/ Y h) (/ X w))))
       (cons (floor x) (floor y))))))))
 
-(resize 1/3) ; временно: увеличим карту в 3 раза
+;(resize 1/3) ; временно: увеличим карту в 3 раза
 
 ; init
 (glShadeModel GL_SMOOTH)
@@ -296,7 +296,11 @@
    (glEnable GL_BLEND)
 
    ; теперь попросим уровень отрисовать себя
-   (level:draw (if mouse (xy:screen->tile mouse)))
+   (define creatures (map (lambda (id)
+         (tuple (interact id (tuple 'get-location)) (interact id (tuple 'get-animation-frame))))
+      (interact 'creatures (tuple 'get 'monsters))))
+
+   (level:draw (if mouse (xy:screen->tile mouse)) creatures)
 
    ; окошки, консолька, etc.
    (render-windows)
