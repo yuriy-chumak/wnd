@@ -63,10 +63,10 @@
 
 ; =============================
 ; 1. Загрузим игровой уровень
-(level:load "001")
+(level:load "007")
 
 ; временная функция работы с level-collision
-(define collision-data (level:get-collisions))
+(define collision-data (level:get-layer 'collision))
 
 (define H (length collision-data))       ; высота уровня
 (define W (length (car collision-data))) ; ширина уровня
@@ -80,7 +80,8 @@
    (if (and (< -1 x W) (< -1 y H))
       (lref (lref collision-data y) x)))
 
-(define object-data (level:get-objects))
+(define object-data (level:get-layer 'object))
+(print object-data)
 (define (get-object x y)
    (if (and (< -1 x W) (< -1 y H))
       (lref (lref object-data y) x)))
@@ -91,16 +92,27 @@
             (set-car! p id)
             (loop (cdr p) (- x 1))))))
 
+(define setup-data (level:get-layer 'setup))
 ; номера жаровни, горящей жаровни, решетки
-(define gem-id (+ (level:get-gid 'dungeon) 135))
-(define gemH-id (+ gem-id 16))
-(define grid-id (+ (level:get-gid 'dungeon) 35))
+(define grid-id (lref (lref setup-data 0) 0))
+(define gem-id  (lref (lref setup-data 0) 1))
+(define gemH-id (lref (lref setup-data 0) 2))
 
+(print "grid-id: " grid-id)
+(print "gem-id: " gem-id)
 ; =================================================================
 ; -=( hero )=---------
 (define hero (make-creature 'hero #empty))
-; зададим позицию героя в мире
-(creature:set-location 'hero (cons 2 3))
+; зададим позицию героя в мире (найдем его в сетапе)
+(creature:set-location 'hero
+   (call/cc (lambda (return)
+      (map (lambda (y row)
+               (map (lambda (x id)
+                        (unless (eq? id 0)
+                           (return (cons x y))))
+                  (iota W) row))
+         (iota (- H 1) 1) ; skip first line (with row id's data)
+         (cdr setup-data)))))
 
 ; зададим анимации герою, в нашем случае он будет выглядеть как скелет
 (creature:set-animations 'hero 'zombie "animations/zombie.ini")
@@ -178,7 +190,10 @@
                (eq? (at (car to) (cdr to)) 0)
                (let ((object (get-object (car to) (cdr to))))
                   (if (or (eq? object gem-id) (eq? object gemH-id))
-                     (eq? (at (+ (car to) dx) (+ (cdr to) dy)) 0)
+                     (and
+                        (eq? (at (+ (car to) dx) (+ (cdr to) dy)) 0)
+                        (let ((o (get-object (+ (car to) dx) (+ (cdr to) dy))))
+                           (and (not (eq? o gem-id)) (not (eq? o gemH-id)))))
                      #true))))))
       move-available))
 
@@ -189,12 +204,11 @@
 
 ; служебные переменные
 (define timestamp (box 0))
-(define calculating-world (box #false))
 
 ; draw
 (gl:set-renderer (lambda (mouse)
    ; тут мы поворачиваем нашего шероя в сторону мышки
-   (unless (unbox calculating-world)
+   (unless (unbox *calculating*)
       (let*((mousetile (xy:screen->tile mouse))
             (herotile (creature:get-location 'hero))
             (dx (- (car mousetile) (car herotile)))
@@ -252,7 +266,7 @@
 
    ; let's draw mouse pointer
    (if (and mouse
-            (not (unbox calculating-world)))
+            (not (unbox *calculating*)))
       (let*((mousetile (xy:screen->tile mouse))
             (move-available (move-available? mousetile))
             (id (+ (level:get-gid 'pointer) (if move-available 0 1)))
@@ -301,11 +315,11 @@
 
 (gl:set-mouse-handler (lambda (button x y)
    (print "mouse: " button " (" x ", " y ")")
-   (unless (unbox calculating-world) ; если мир сейчас не просчитывается (todo: оформить отдельной функцией)
+   (unless (unbox *calculating*) ; если мир сейчас не просчитывается (todo: оформить отдельной функцией)
       (cond
          ((eq? button 1)
             (let ((tile (xy:screen->tile (cons x y))))
-               (set-car! calculating-world 42)
+               (set-world-busy #true)
                (mail 'game (tuple 'move tile))))
          (else
             ; nothing
@@ -322,12 +336,13 @@
                      (rel (cons
                         (- (car to) (car hero))
                         (- (cdr to) (cdr hero)))))
+                  (print "object-to: " (get-object (car to) (cdr to)))
                   (if (or
                         (eq? (get-object (car to) (cdr to)) gem-id)
                         (eq? (get-object (car to) (cdr to)) gemH-id))
                      (begin
                         (set-object (+ (car to) (car rel)) (+ (cdr to) (cdr rel))
-                           (let ((background (level:get-background)))
+                           (let ((background (level:get-layer 'background)))
                               (if (eq? (lref (lref background (+ (cdr to) (cdr rel))) (+ (car to) (car rel))) grid-id)
                                  gemH-id gem-id)))
                         (set-object (car to) (cdr to) 0)))
@@ -352,10 +367,10 @@
                                           (and f (if (eq? b grid-id)
                                                    (eq? o gemH-id) #true)))
                                     f b o))
-                           #true (level:get-background) (level:get-objects))))
+                           #true (level:get-layer 'background) (level:get-layer 'object))))
                (if win?
                   (creature:play-animation 'hero 'cast 'cast)
-                  (set-car! calculating-world #false)))
+                  (set-world-busy #false)))
             (this itself))
          (else
             (print "logic: unhandled event: " msg)

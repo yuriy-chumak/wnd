@@ -17,16 +17,9 @@
 (define (level:get property)
    (interact 'level (tuple 'get property)))
 
-; попросить у уровня "background" слой
-;  возвращает список списков с номерами тайлов
-(define (level:get-background)
-   (interact 'level (tuple 'get 'background-data)))
-;  возвращает слой "collision"
-(define (level:get-collisions)
-   (interact 'level (tuple 'get 'collision-data)))
-
-(define (level:get-objects)
-   (interact 'level (tuple 'get 'object-data)))
+; вернуть "слой" уровня по имени
+(define (level:get-layer name)
+   (getf (interact 'level (tuple 'get 'layers)) name))
 
 ; возвращает первый номер тайла, ассоциированный с тайлсетом name
 (define (level:get-gid name)
@@ -39,6 +32,14 @@
 (define (level:draw mouse creatures)
    (interact 'level (tuple 'draw mouse creatures)))
 
+
+; -------------------------------
+; что касается "занятости" мира расчетами
+(define *calculating* (box #false)) ; внутренняя переменная
+(define (set-world-busy busy)
+   (set-car! *calculating* busy))
+(define (world-busy?)
+   (car *calculating*))
 
 ; -----------------------------------------------
 ; helper functions
@@ -109,8 +110,6 @@
                               (SOIL_load_OGL_texture (c-string (xml-get-attribute image 'source "checker.png")) SOIL_LOAD_RGBA SOIL_CREATE_NEW_ID 0))
                            (define image-width (string->number (xml-get-attribute image 'width 64) 10))
                            (define image-height (string->number (xml-get-attribute image 'height 32) 10))
-                           ;; (print "image-width: " image-width)
-                           ;; (print "image-height: " image-height)
 
                            (define first-gid (string->number (xml-get-attribute tileset 'firstgid 0) 10))
                            (define tile-width (string->number (xml-get-attribute tileset 'tilewidth 64) 10))
@@ -122,14 +121,6 @@
                                                       (string->number (xml-get-attribute tileoffset 'x 0) 10)
                                                       (string->number (xml-get-attribute tileoffset 'y 0) 10))
                                                    '(0 . 0)))
-
-                           ;; (print "tile-width: " tile-width)
-                           ;; (print "tile-height: " tile-height)
-
-                           ;; (print "tile-count: " tile-count)
-                           ;; (print "columns: " columns)
-                           ;; (print "tile-offsets: " tile-offsets)
-                           ;; (print "------------------")
 
                            (define tiles (fold append #null
                               (map (lambda (row)
@@ -156,37 +147,16 @@
 
 
                ;; ; prepare layers
-               (define (get-layer-data level name)
-                  (define layer (car (filter (lambda (tag) (equal? (xml-get-attribute tag 'name #f) name)) (xml-get-subtags level 'layer))))
-                  (define data (xml-get-value (xml-get-subtag layer 'data)))
-
-                  data)
-
-               (define background (get-layer-data level "background"))
-               (define background-data (map (lambda (line)
-                     (map (lambda (ch) (string->number ch 10)) (split-by-comma line))) ;(ref ch 0)
-                  (split-by-newline background)))
-
-               ; objects
-               (define object (get-layer-data level "object"))
-               (define object-data (map (lambda (line)
-                     (map (lambda (ch) (string->number ch 10)) (split-by-comma line))) ;(ref ch 0)
-                  (split-by-newline object)))
-
-               ; collisions
-               ; todo: make collision-data a tuple of tuple!
-               (define collision (get-layer-data level "collision"))
-               (define collision-data (map (lambda (line)
-                     (map (lambda (ch) (string->number ch 10)) (split-by-comma line))) ;(ref ch 0)
-                  (split-by-newline collision)))
-               (define (at x y)
-                  (if (and (< -1 x WIDTH) (< -1 y HEIGHT))
-                     (lref (lref collision-data y) x)))
-
-
-               ; ...
-               (print "ok.")
-
+               (define layers (fold (lambda (ff layer)
+                                       (define name (xml-get-attribute layer 'name #f))
+                                       (define data (xml-get-value (xml-get-subtag layer 'data)))
+                                       (put ff (string->symbol name)
+                                          (map (lambda (line)
+                                                  (map (lambda (ch) (string->number ch 10))
+                                                     (split-by-comma line)))
+                                             (split-by-newline data))))
+                                 #empty
+                                 (xml-get-subtags level 'layer)))
                (mail sender 'ok)
                ; парсинг и предвычисления закончены, запишем нужные параметры
                (this (fold (lambda (ff kv) (put ff (car kv) (cdr kv))) itself `(
@@ -196,9 +166,7 @@
                   (gids . ,gids)
                   (columns . ,columns)
                   (tileset . ,tileset)
-                  (background-data . ,background-data)
-                  (object-data . ,object-data)
-                  (collision-data . ,collision-data)))))
+                  (layers . ,layers)))))
 
             ; draw the level on the screen
             ((draw mouse creatures); interact
@@ -207,8 +175,8 @@
                      (width (getf itself 'width))
                      (height (getf itself 'height))
                      (tileset (getf itself 'tileset))
-                     (background-data (getf itself 'background-data))
-                     (object-data (getf itself 'object-data)))
+                     (background-data (getf (get itself 'layers #empty) 'background))
+                     (object-data (getf (get itself 'layers #empty) 'object)))
 
                   (define (X x y tw th)
                      (- (* x (/ w 2))

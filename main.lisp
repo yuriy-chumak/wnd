@@ -137,7 +137,7 @@
 (level:load "river_encampment")
 
 ; временная функция работы с level-collision
-(define collision-data (level:get-collisions))
+(define collision-data (level:get-layer 'collision))
 
 (define H (length collision-data))       ; высота уровня
 (define W (length (car collision-data))) ; ширина уровня
