@@ -10,6 +10,13 @@
 (define (level:load filename)
    (interact 'level (tuple 'load filename)))
 
+; возращает характеристику уровня
+; список:
+;  'tileheight: высота тайла в пикселях
+;  'tilewidth: ширина тайла в пикселях
+(define (level:get property)
+   (interact 'level (tuple 'get property)))
+
 ; попросить у уровня "background" слой
 ;  возвращает список списков с номерами тайлов
 (define (level:get-background)
@@ -17,6 +24,9 @@
 ;  возвращает слой "collision"
 (define (level:get-collisions)
    (interact 'level (tuple 'get 'collision-data)))
+
+(define (level:get-objects)
+   (interact 'level (tuple 'get 'object-data)))
 
 ; возвращает первый номер тайла, ассоциированный с тайлсетом name
 (define (level:get-gid name)
@@ -26,8 +36,8 @@
    (getf (interact 'level (tuple 'get 'columns)) name))
 
 ; нарисовать уровень
-(define (level:draw mouse)
-   (interact 'level (tuple 'draw mouse)))
+(define (level:draw mouse creatures)
+   (interact 'level (tuple 'draw mouse creatures)))
 
 
 ; -----------------------------------------------
@@ -81,7 +91,9 @@
                (define columns (list->ff (map (lambda (tileset)
                      (cons
                         (string->symbol (xml-get-attribute tileset 'name "noname"))
-                        (string->number (xml-get-attribute tileset 'columns 0) 10)))
+                        (/;(string->number (xml-get-attribute tileset 'columns 0) 10)) <- old code
+                           (string->number (xml-get-attribute (xml-get-subtag tileset 'image) 'width 64) 10)
+                           (string->number (xml-get-attribute tileset 'tilewidth 64) 10))))
                   tilesets)))
 
                ; make ff (id > tileset element)
@@ -119,27 +131,27 @@
                            ;; (print "tile-offsets: " tile-offsets)
                            ;; (print "------------------")
 
-                        (define tiles (fold append #null
-                           (map (lambda (row)
-                                 (map (lambda (col)
-                                       (let ((ul_x (* col tile-width))
-                                             (ul_y (* row tile-height)))
-                                          (tuple
-                                             id
-                                             tile-width
-                                             tile-height
-                                             tile-offsets
-                                             ; texcoords
-                                             (vector
-                                                (/ ul_x image-width)
-                                                (/ ul_y image-height)
-                                                (/ (+ ul_x tile-width) image-width)
-                                                (/ (+ ul_y tile-height) image-height)))))
-                                    (iota columns)))
-                              (iota (/ tile-count columns)))))
-                        (list->ff (map cons
-                              (iota (length tiles) first-gid)
-                              tiles))))
+                           (define tiles (fold append #null
+                              (map (lambda (row)
+                                    (map (lambda (col)
+                                          (let ((ul_x (* col tile-width))
+                                                (ul_y (* row tile-height)))
+                                             (tuple
+                                                id
+                                                tile-width
+                                                tile-height
+                                                tile-offsets
+                                                ; texcoords
+                                                (vector
+                                                   (/ ul_x image-width)
+                                                   (/ ul_y image-height)
+                                                   (/ (+ ul_x tile-width) image-width)
+                                                   (/ (+ ul_y tile-height) image-height)))))
+                                       (iota columns)))
+                                 (iota (/ tile-count columns)))))
+                           (list->ff (map cons
+                                 (iota (length tiles) first-gid)
+                                 tiles))))
                      tilesets)))
 
 
@@ -189,7 +201,7 @@
                   (collision-data . ,collision-data)))))
 
             ; draw the level on the screen
-            ((draw); interact
+            ((draw mouse creatures); interact
                (let ((w (getf itself 'tilewidth))
                      (h (getf itself 'tileheight))
                      (width (getf itself 'width))
@@ -265,9 +277,9 @@
                   ;   рисовать мы их будем все вместе - слой "object" и наших creatures
 
                   ; список NPC:
-                  (define creatures (map (lambda (id)
-                        (tuple (interact id (tuple 'get-location)) (interact id (tuple 'get-animation-frame))))
-                     (interact 'creatures (tuple 'get 'monsters))))
+                  ;(define creatures (map (lambda (id)
+                  ;      (tuple (interact id (tuple 'get-location)) (interact id (tuple 'get-animation-frame))))
+                  ;   (interact 'creatures (tuple 'get 'monsters))))
 
                   (draw-layer object-data (append creatures (list
                      (tuple (interact 'hero (tuple 'get-location))
