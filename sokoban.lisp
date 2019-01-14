@@ -209,14 +209,14 @@
             ((and (> dx 0) (= dy 0))
                (creature:set-orientation 'hero 2))
 
-            ;; ((and (= dx +1) (= dy +1))
-            ;;    (creature:set-orientation 'hero 3))
-            ;; ((and (= dx -1) (= dy +1))
-            ;;    (creature:set-orientation 'hero 5))
-            ;; ((and (= dx -1) (= dy -1))
-            ;;    (creature:set-orientation 'hero 7))
-            ;; ((and (= dx +1) (= dy -1))
-            ;;    (creature:set-orientation 'hero 1))
+            ((and (= dx +1) (= dy +1))
+               (creature:set-orientation 'hero 3))
+            ((and (= dx -1) (= dy +1))
+               (creature:set-orientation 'hero 5))
+            ((and (= dx -1) (= dy -1))
+               (creature:set-orientation 'hero 7))
+            ((and (= dx +1) (= dy -1))
+               (creature:set-orientation 'hero 1))
          )))
 
    ; просто регулярные действия
@@ -322,8 +322,6 @@
                      (rel (cons
                         (- (car to) (car hero))
                         (- (cdr to) (cdr hero)))))
-                  (print "to id: " (get-object (car to) (cdr to)))
-                  (print "gemH-id: " gemH-id)
                   (if (or
                         (eq? (get-object (car to) (cdr to)) gem-id)
                         (eq? (get-object (car to) (cdr to)) gemH-id))
@@ -333,8 +331,19 @@
                               (if (eq? (lref (lref background (+ (cdr to) (cdr rel))) (+ (car to) (car rel))) grid-id)
                                  gemH-id gem-id)))
                         (set-object (car to) (cdr to) 0)))
-                  ; и пошлем героя в дорогу
-                  ;(creature:play-animation 'hero 'run #f)
+
+                  ; повернем героя в нужную сторону
+                  (cond
+                     ((equal? rel '(0 . -1))
+                        (creature:set-orientation 'hero 0))
+                     ((equal? rel '(+1 . 0))
+                        (creature:set-orientation 'hero 2))
+                     ((equal? rel '(0 . +1))
+                        (creature:set-orientation 'hero 4))
+                     ((equal? rel '(-1 . 0))
+                        (creature:set-orientation 'hero 6)))
+
+                  ; и пошлем его в дорогу
                   (creature:move-with-animation 'hero rel 'run #f)))
             ; todo: хорошо бы добавить проверку на проигрыш...
             ; а теперь проверка на выигрыш:
