@@ -72,29 +72,27 @@
 
                ; compiling tilesets:
 
-               (define tilewidth (string->number (xml-get-attribute level 'tilewidth 128) 10)) ; ширина тайла
-               (define tileheight (string->number (xml-get-attribute level 'tileheight 64) 10)) ; высота тайла
-               (define width (string->number (xml-get-attribute level 'width 64) 10))  ; количество тайлов по горизонтали
-               (define height (string->number (xml-get-attribute level 'height 64) 10)); количество тайлов по вертикали
+               (define tilewidth (string->number (xml-get-attribute level 'tilewidth #f) 10)) ; ширина тайла
+               (define tileheight (string->number (xml-get-attribute level 'tileheight #f) 10)) ; высота тайла
+               (define width (string->number (xml-get-attribute level 'width #f) 10))  ; количество тайлов по горизонтали
+               (define height (string->number (xml-get-attribute level 'height #f) 10)); количество тайлов по вертикали
 
-               ; (opengl should be enabled for loading images)
-               (define WIDTH (string->number (xml-get-attribute level 'width "0") 10))
-               (define HEIGHT (string->number (xml-get-attribute level 'height "0") 10))
+               (define WIDTH (string->number (xml-get-attribute level 'width #f) 10))
+               (define HEIGHT (string->number (xml-get-attribute level 'height #f) 10))
 
                (define tilesets (xml-get-subtags level 'tileset))
-               (print-to stderr "tilesets count: " (length tilesets))
 
                (define gids (list->ff (map (lambda (tileset)
                      (cons
                         (string->symbol (xml-get-attribute tileset 'name "noname"))
-                        (string->number (xml-get-attribute tileset 'firstgid 0) 10)))
+                        (string->number (xml-get-attribute tileset 'firstgid "0") 10)))
                   tilesets)))
                (define columns (list->ff (map (lambda (tileset)
                      (cons
                         (string->symbol (xml-get-attribute tileset 'name "noname"))
-                        (/;(string->number (xml-get-attribute tileset 'columns 0) 10)) <- old code
-                           (string->number (xml-get-attribute (xml-get-subtag tileset 'image) 'width 64) 10)
-                           (string->number (xml-get-attribute tileset 'tilewidth 64) 10))))
+                        (/;(string->number (xml-get-attribute tileset 'columns "0") 10)) <- old code
+                           (string->number (xml-get-attribute (xml-get-subtag tileset 'image) 'width "64") 10)
+                           (string->number (xml-get-attribute tileset 'tilewidth "64") 10))))
                   tilesets)))
 
                ; make ff (id > tileset element)
@@ -108,18 +106,18 @@
                               (tileoffset (xml-get-subtag tileset 'tileoffset)))
                            (define id ; OpenGL texture atlas id
                               (SOIL_load_OGL_texture (c-string (xml-get-attribute image 'source "checker.png")) SOIL_LOAD_RGBA SOIL_CREATE_NEW_ID 0))
-                           (define image-width (string->number (xml-get-attribute image 'width 64) 10))
-                           (define image-height (string->number (xml-get-attribute image 'height 32) 10))
+                           (define image-width (string->number (xml-get-attribute image 'width "64") 10))
+                           (define image-height (string->number (xml-get-attribute image 'height "32") 10))
 
-                           (define first-gid (string->number (xml-get-attribute tileset 'firstgid 0) 10))
-                           (define tile-width (string->number (xml-get-attribute tileset 'tilewidth 64) 10))
-                           (define tile-height (string->number (xml-get-attribute tileset 'tileheight 32) 10))
-                           (define tile-count (string->number (xml-get-attribute tileset 'tilecount 0) 10))
-                           (define columns (/ image-width tile-width)) ;(string->number (xml-get-attribute tileset 'columns 0) 10))
+                           (define first-gid (string->number (xml-get-attribute tileset 'firstgid "0") 10))
+                           (define tile-width (string->number (xml-get-attribute tileset 'tilewidth "64") 10))
+                           (define tile-height (string->number (xml-get-attribute tileset 'tileheight "32") 10))
+                           (define tile-count (string->number (xml-get-attribute tileset 'tilecount "0") 10))
+                           (define columns (/ image-width tile-width)) ;(string->number (xml-get-attribute tileset 'columns 0) 10)) <- old
                            (define tile-offsets (if tileoffset
                                                    (cons
-                                                      (string->number (xml-get-attribute tileoffset 'x 0) 10)
-                                                      (string->number (xml-get-attribute tileoffset 'y 0) 10))
+                                                      (string->number (xml-get-attribute tileoffset 'x "0") 10)
+                                                      (string->number (xml-get-attribute tileoffset 'y "0") 10))
                                                    '(0 . 0)))
 
                            (define tiles (fold append #null
@@ -128,11 +126,11 @@
                                           (let ((ul_x (* col tile-width))
                                                 (ul_y (* row tile-height)))
                                              (tuple
-                                                id
+                                                id ; texture id
                                                 tile-width
                                                 tile-height
                                                 tile-offsets
-                                                ; texcoords
+                                                ; texcoords:
                                                 (vector
                                                    (/ ul_x image-width)
                                                    (/ ul_y image-height)
@@ -146,7 +144,7 @@
                      tilesets)))
 
 
-               ;; ; prepare layers
+               ; prepare layers
                (define layers (fold (lambda (ff layer)
                                        (define name (xml-get-attribute layer 'name #f))
                                        (define data (xml-get-value (xml-get-subtag layer 'data)))
@@ -174,9 +172,7 @@
                      (h (getf itself 'tileheight))
                      (width (getf itself 'width))
                      (height (getf itself 'height))
-                     (tileset (getf itself 'tileset))
-                     (background-data (getf (get itself 'layers #empty) 'background))
-                     (object-data (getf (get itself 'layers #empty) 'object)))
+                     (tileset (getf itself 'tileset)))
 
                   (define (X x y tw th)
                      (- (* x (/ w 2))
@@ -189,7 +185,7 @@
                         (- h th)))
 
                   ; эта функция рисует тайл на экране
-                  ; примитивно, не оптимизировано - но ранняя оптимизация нам не нужна
+                  ; примитивно, не оптимизировано - но ранняя оптимизация нам и не нужна
                   (define (draw-tile id i j) ; i means x, j means y
                      (let ((tile (getf tileset id)))
                         (if tile
@@ -219,36 +215,34 @@
                   (define (draw-layer data entities)
                      (map (lambda (line j)
                            (map (lambda (tid i)
+                                 ; если есть что рисовать - рисуем
                                  (unless (eq? tid 0)
                                     (draw-tile tid i j))
-                                 (if entities (for-each (lambda (entity)
-                                                   (if (and
-                                                         (eq? (car (ref entity 1)) i)
-                                                         (eq? (cdr (ref entity 1)) j))
-                                                      (let ((tile (ref entity 2)))
+                                 ; и если в клетке есть кого рисовать, то нарисуем
+                                 (if entities
+                                    (for-each (lambda (entity)
+                                                (if (and
+                                                      (eq? (car (ref entity 1)) i)
+                                                      (eq? (cdr (ref entity 1)) j))
+                                                   (let ((tile (ref entity 2)))
                                                       (draw-tile
                                                          (car tile)
                                                          (unless (cdr tile) i (+ i (cadr tile)))
                                                          (unless (cdr tile) j (+ j (cddr tile)))))))
-                                                entities)))
+                                       entities)))
                               line
                               (iota (length line))))
                         data
                         (iota (length data))))
 
                   ; 1. нарисуем фон (трава, вода, но не стены или деревья)
-                  (if background-data
-                     (draw-layer background-data #false))
+                  (define background-data ((itself 'layers) 'background))
+                  (draw-layer background-data #false)
 
                   ; 2. теперь очередь движимых и недвижимых объектов
                   ;   так как движимые объекты должны уметь прятаться за недвижимые, то
                   ;   рисовать мы их будем все вместе - слой "object" и наших creatures
-
-                  ; список NPC:
-                  ;(define creatures (map (lambda (id)
-                  ;      (tuple (interact id (tuple 'get-location)) (interact id (tuple 'get-animation-frame))))
-                  ;   (interact 'creatures (tuple 'get 'monsters))))
-
+                  (define object-data ((itself 'layers) 'object))
                   (draw-layer object-data (append creatures (list
                      (tuple (interact 'hero (tuple 'get-location))
                             (interact 'hero (tuple 'get-animation-frame)))

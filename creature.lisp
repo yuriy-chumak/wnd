@@ -6,7 +6,7 @@
    (mail creature (tuple 'set-location location)))
 ; получить положение создания
 (define (creature:get-location creature)
-   (interact creature (tuple 'get-location)))
+   (interact creature (tuple 'get 'location)))
 
 ; задать поворот в пространстве
 (define (creature:set-orientation creature orientation)
@@ -24,7 +24,7 @@
    (mail creature (tuple 'set-next-location location)))
 
 ; отыграть цикл анимации (с ожиданием)
-(define (creature:play-animation creature animation next-animation) ; returns #false
+(define (creature:play-animation creature animation next-animation)
    (let ((started (time-ms))
          (saved-animation (or next-animation (interact creature (tuple 'get 'animation))))
          (duration (creature:set-current-animation creature animation)))
@@ -37,7 +37,7 @@
          (creature:set-current-animation creature saved-animation))))
 
 ; двигаться (с анимацией)
-(define (creature:move-with-animation creature move animation next-animation) ; returns #false
+(define (creature:move-with-animation creature move animation next-animation)
    (let ((started (time-ms))
          (saved-animation (or next-animation (interact creature (tuple 'get 'animation))))
          (location (creature:get-location creature))
@@ -119,7 +119,6 @@
       (tuple-case msg
          ; low level interaction interface
          ((set key value)
-            (print-to stdout name ": setting " key " to " value)
             (this (put itself key value)))
          ((get key)
             (mail sender (get itself key #false))
@@ -272,7 +271,7 @@
          (else
             (print "unhandled event: " msg)
             (this itself)))))))
-   (list->ff (list
+   (define creature (list->ff (list
       (cons 'set-location (lambda (location)
          (creature:set-location name location)))
       (cons 'get-location (lambda ()
@@ -280,20 +279,6 @@
       (cons 'set-orientation (lambda (orientation)
          (creature:set-orientation name orientation)))
       )))
-
-; набор функций - работы с НИП
-;; (define (creature:send-event creature event . args)
-;;    (mail creature (tuple 'process-event event args)))
-
-;; (define (creature:move itself xy)
-;;    (let*((location (get itself 'location '(0 . 0)))
-;;          (itself (put itself 'location (cons (+ (car location) (car xy)) (+ (cdr location) (cdr xy)))))
-;;          (orientation (cond
-;;             ((equal? xy '(-1 . 0)) 6)
-;;             ((equal? xy '(0 . -1)) 0)
-;;             ((equal? xy '(+1 . 0)) 2)
-;;             ((equal? xy '(0 . +1)) 4)
-;;             (else (get itself 'orientation 0))))
-;;          (itself (put itself 'orientation orientation)))
-;;       itself))
+   (mail 'creatures (tuple 'set name creature))
+   creature)
 
