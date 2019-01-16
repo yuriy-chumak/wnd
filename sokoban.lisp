@@ -7,8 +7,8 @@
 (begin
    (define config (list->ff `(
       ; напомню, что мы используем фиксированный шрифт размера 9*16
-      (width  . ,(* 1  9 80))      ; 80 знакомест в ширину
-      (height . ,(* 1 16 25))))))) ; 25 знакомест в высоту
+      (width  . ,(* 2  9 80))      ; 80 знакомест в ширину
+      (height . ,(* 2 16 25))))))) ; 25 знакомест в высоту
 (import (lib gl config))
 
 ; игра пошаговая! посему все ходы только после клика "я готов" (пока это ПКМ) и все НПС
@@ -231,13 +231,9 @@
 (print "cx: " cx ", cy: " cy)
 (print "width: " width ", height: " height)
 
-;              x-left             x-right y-left         y-right
-;(define window (vector (+ -32 -800) -32 (+ 3645 32 -800) (+ 2048 32)))
+
 (define window (vector  (- cx width) (- cy height)
                         (+ cx width) (+ cy height)))
-
-;(define window (vector -1920 -64 1920 (- 2160 64)))
-
 
 (define (resize scale) ; изменение масштаба
    (let*((x (floor (/ (+ (ref window 3) (ref window 1)) 2)))
@@ -255,6 +251,8 @@
       (set-ref! window 2 (- (ref window 2) (* dy y)))
       (set-ref! window 3 (+ (ref window 3) (* dx x)))
       (set-ref! window 4 (- (ref window 4) (* dy y)))))
+
+(resize 0.6)
 
 ; функция перевода экранных координат в номер тайла, на который они попадают
 (define (xy:screen->tile xy)
@@ -372,10 +370,11 @@
    (if (and mouse
             (not (unbox *calculating*)))
       (let*((mousetile (xy:screen->tile mouse))
-            (action-available (or
-               (step-available? from mousetile)
-               (move-available? from mousetile)))
-            (id (+ (level:get-gid 'pointer) (if action-available 0 1)))
+            (id (+ (level:get-gid 'pointer)
+                  (cond
+                     ((step-available? from mousetile) 0)
+                     ((move-available? from mousetile) 2)
+                     (else 1))))
             (tile (getf (interact 'level (tuple 'get 'tileset)) id))
             (w (/ (- (ref window 3) (ref window 1)) 48)) ;  размер курсора
             (st (ref tile 5))
