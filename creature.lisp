@@ -189,18 +189,20 @@
                   (position (string->number position 10))
                   (orientation (get itself 'orientation 0))
                   (frame (floor (/ (* ssms frames) duration)))
+
+                  (delta (if delta (let ((n (if (string-eq? animation-type "back_forth")
+                                                (+ frames frames -1)
+                                                frames)))
+                     (cons (* (min frame n) (/ (car delta) n))
+                           (* (min frame n) (/ (cdr delta) n))))))
+
                   (frame (cond
                      ((string-eq? animation-type "play_once")
                         (min (- frames 1) frame))
                      ((string-eq? animation-type "looped")
                         (mod frame frames))
                      ((string-eq? animation-type "back_forth")
-                        (lref (append (iota frames) (reverse (iota (- frames 2) 1))) (mod frame (+ frames frames -2))))))
-                  (delta (if delta (let ((n (if (string-eq? animation-type "back_forth")
-                                                (+ frames frames -1)
-                                                frames)))
-                     (cons (* frame (/ (car delta) n))
-                           (* frame (/ (cdr delta) n)))))))
+                        (lref (append (iota frames) (reverse (iota (- frames 2) 1))) (mod frame (+ frames frames -2)))))))
                (mail sender (cons (+ (get itself 'fg 0) position
                   frame
                   (* columns (get orientations orientation 0)))
