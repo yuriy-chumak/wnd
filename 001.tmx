@@ -19,6 +19,10 @@
  <tileset firstgid="608" name="pointer" tilewidth="28" tileheight="28" tilecount="4" columns="2">
   <image source="sokoban/pointers.png" width="56" height="56"/>
  </tileset>
+ <tileset firstgid="612" name="antlion" tilewidth="128" tileheight="128" tilecount="304" columns="38">
+  <tileoffset x="-32" y="16"/>
+  <image source="animations/antlion.png" width="4864" height="1024"/>
+ </tileset>
  <layer name="background" width="7" height="8">
   <data encoding="csv">
 24,21,21,21,21,22,49,
@@ -36,7 +40,7 @@
 51,151,167,0,0,0,0,
 0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,
-0,0,256,0,0,0,0,
+0,0,612,0,0,0,0,
 0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,
