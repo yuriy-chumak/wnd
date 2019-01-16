@@ -1,4 +1,8 @@
 #!/usr/bin/ol
+(import
+   (lib math) (otus random!)
+   (lang sexp) (scheme misc)
+   (file xml) (lib rlutil))
 
 ; ----------------------------------
 ; зададим размеры графического окна
@@ -46,14 +50,9 @@
    (print GRAY (cdr frames) " fps")
 ))
 
-; остальные игровые библиотеки
-(import (lib math))
-(import (otus random!))
-(import (lang sexp))
-(import (scheme misc))
-(import (file xml))
-(import (scheme dynamic-bindings))
-(import (lib rlutil))
+(define win (create-window 12 4 55 9))
+;(set-window-background win GREEN)
+(set-window-writer win (lambda (?) #false))
 
 ; -=( level )=-----------------
 ;     заведует игровой картой
@@ -267,8 +266,8 @@
 (print "width: " width ", height: " height)
 
 
-(define window (vector  (- cx width) (- cy height)
-                        (+ cx width) (+ cy height)))
+(define window (tuple (- cx width) (- cy height)
+                      (+ cx width) (+ cy height)))
 
 (define (resize scale) ; изменение масштаба
    (let*((x (floor (/ (+ (ref window 3) (ref window 1)) 2)))
@@ -279,6 +278,7 @@
       (set-ref! window 2 (- y h))
       (set-ref! window 3 (+ x w))
       (set-ref! window 4 (+ y h))))
+
 (define (move dx dy) ; сдвинуть окно
    (let*((x (floor (* (- (ref window 3) (ref window 1)) 0.01)))
          (y (floor (* (- (ref window 4) (ref window 2)) 0.01))))
@@ -461,18 +461,22 @@
 (gl:set-keyboard-handler (lambda (key)
    (print "key: " key)
    (case key
-      (#x18
+      (vkQ
          ;(mail 'music (tuple 'shutdown))
          (halt 1))))) ; q - quit
 
 (gl:set-mouse-handler (lambda (button x y)
    (print "mouse: " button " (" x ", " y ")")
    (unless (unbox *calculating*) ; если мир сейчас не просчитывается (todo: оформить отдельной функцией)
-      (cond
-         ((eq? button 1)
+      (case button
+         (1 ; left
             (let ((tile (xy:screen->tile (cons x y))))
                (set-world-busy #true)
                (mail 'game (tuple 'move tile))))
+         (5 ; scroll down
+            (resize 1.1))
+         (4 ; scroll up
+            (resize 0.9))
          (else
             ; nothing
             #false)))))
@@ -549,8 +553,7 @@
             (if (fold (lambda (r gem)
                         (and r (eq? (cdr gem) gemH-id)))
                   #true gems)
-               (fork (lambda ()
-                  (creature:play-animation 'hero 'cast 'cast)))
+               (creature:play-animation 'hero 'cast 'die)
                (set-world-busy #false))
             (this itself))
          (else
