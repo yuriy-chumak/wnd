@@ -32,7 +32,7 @@
 
 ; -------------------------------------------------------
 ; теперь текстовая консолька
-(import (lib gl console))
+#|(import (lib gl console))
 
 ; окно дебага (покажем fps):
 (define fps (create-window 70 24 10 1))
@@ -48,11 +48,7 @@
             (set-car! frames 0)
             (set-car! time (- now started)))))
    (print GRAY (cdr frames) " fps")
-))
-
-(define win (create-window 12 4 55 9))
-;(set-window-background win GREEN)
-(set-window-writer win (lambda (?) #false))
+))|#
 
 ; -=( level )=-----------------
 ;     заведует игровой картой
@@ -396,7 +392,7 @@
    (level:draw #false gems)
 
    ; окошки, консолька, etc.
-   (render-windows)
+   ;(render-windows)
 
    ; let's draw mouse pointer
    (define from (creature:get-location 'hero))
