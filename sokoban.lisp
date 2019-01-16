@@ -7,8 +7,8 @@
 (begin
    (define config (list->ff `(
       ; напомню, что мы используем фиксированный шрифт размера 9*16
-      (width  . ,(* 2  9 80))      ; 80 знакомест в ширину
-      (height . ,(* 2 16 25))))))) ; 25 знакомест в высоту
+      (width  . ,(* 1  9 80))      ; 80 знакомест в ширину
+      (height . ,(* 1 16 25))))))) ; 25 знакомест в высоту
 (import (lib gl config))
 
 ; игра пошаговая! посему все ходы только после клика "я готов" (пока это ПКМ) и все НПС
@@ -70,18 +70,19 @@
 
 (define H (length collision-data))       ; высота уровня
 (define W (length (car collision-data))) ; ширина уровня
+; а теперь подготовим collision-data к быстрой работе - превратим его в статический tuple
+(define collision-data (list->tuple (map list->tuple collision-data)))
+(define collision-data-at (lambda (xy)
+   (ref (ref collision-data (+ (cdr xy) 1)) (+ (car xy) 1))))
 
 ; временная функция: возвращает collision data
 ;  по координатам x,y на карте
-(define (at x y)
-   (if (and (< -1 x W) (< -1 y H))
-      (lref (lref collision-data y) x)))
+;(define (at x y)
+;   (if (and (< -1 x W) (< -1 y H))
+;      (lref (lref collision-data y) x)))
 
 (define object-data (level:get-layer 'object))
-(print object-data)
-(define (get-object x y)
-   (if (and (< -1 x W) (< -1 y H))
-      (lref (lref object-data y) x)))
+; временная функция для стирания объекта с карты
 (define (set-object x y id)
    (if (and (< -1 x W) (< -1 y H))
       (let loop ((p (lref object-data y)) (x x))
@@ -98,30 +99,45 @@
 (print "grid-id: " grid-id)
 (print "gem-id: " gem-id)
 
+; ========================
+; найдем все gem-id объекты и сложим их в список "монстров"
+(define gems
+   (fold (lambda (L line y)
+            (fold (lambda (L o x)
+                     (if (or (eq? o gem-id) (eq? o gemH-id))
+                        (cons (cons (cons x y) o) L)
+                        L))
+               L line (iota W)))
+      #null object-data (iota H)))
+; и поудаляем их из уровня карты
+(for-each (lambda (o)
+      (set-object (caar o) (cdar o) 0))
+   gems)
+
 ; =================================================================
 ; A*
 ; упрощенный A* алгоритм под нашу задачу.
 ; допущения:
 ; 1. выход за границу уровня невозможен (поэтому мы уберем проверки границ)
-;(define collision-data (level:get-layer 'collision))
 ;#|
-(define (A* level from to)
+(define (A* from to)
    (let*((xy from) ; начальное значение поиска пути
          ; для быстрого обращения к элементам карты сконвертируем ее из списка в кортеж
          ; функция (list->tuple) реализована на стороне виртуальной машины, посему очень быстрая
-         (level (list->tuple (map list->tuple level)))
+         (level collision-data)
          ; получить значение из карты по координатам '(x.y), координаты начинаются с 0
-         (level-at (lambda (xy)
-            (ref (ref level (+ (cdr xy) 1)) (+ (car xy) 1))))
+         (level-at collision-data-at)
          ; функция хеширования пары '(x.y), для быстрого поиска в словаре
          (hash (lambda (xy)
             (+ (<< (car xy) 16) (cdr xy))))
+         (gems (fold (lambda (ff o)
+                        (put ff (hash (car o)) #true))
+                  #empty gems))
          ; пуста ли клетка карты "в голове" персонажа, работает для любых координат, даже отрицательных
          (floor? (lambda (xy)
             (and
                (eq? (level-at xy) 0)
-               (let ((o (get-object (car xy) (cdr xy))))
-                  (not (has? (list gem-id gemH-id) o)))))))
+               (eq? (get gems (hash xy) #f) #f)))))
 
    (if (equal? from to) ; а никуда идти и не надо?
       #false ;(tuple 0 0 #empty #empty)
@@ -275,28 +291,37 @@
    (let*((dx (- (car to) (car from)))
          (dy (- (cdr to) (cdr from)))
          (step (cons dx dy))
+         (hash (lambda (xy)
+            (+ (<< (car xy) 16) (cdr xy))))
+         (level collision-data)
+         ; получить значение из карты по координатам '(x.y), координаты начинаются с 0
+         (level-at collision-data-at)
+
+         (gems (fold (lambda (ff o)
+                        (put ff (hash (car o)) #true))
+                  #empty gems))
+
          (step-available (and
-            (or ; один шаг?
+            ; только один шаг
+            (or
                (and (eq? dx 0) (eq? dy +1))
                (and (eq? dx 0) (eq? dy -1))
                (and (eq? dx +1) (eq? dy 0))
                (and (eq? dx -1) (eq? dy 0)))
-            (and ; и ничего не мешает либо пройти либо толкнуть
-               (eq? (at (car to) (cdr to)) 0)
-               (let ((object (get-object (car to) (cdr to))))
-                  (if (or (eq? object gem-id) (eq? object gemH-id))
-                     (and
-                        (eq? (at (+ (car to) dx) (+ (cdr to) dy)) 0)
-                        (let ((o (get-object (+ (car to) dx) (+ (cdr to) dy))))
-                           (and (not (eq? o gem-id)) (not (eq? o gemH-id)))))
-                     #true))))))
+            ; и ничего не мешает либо пройти либо перед этим толкнуть и потом пройти
+            (and
+               (eq? (level-at to) 0)
+               (if (getf gems (hash to)) ; если в клетке стоит чаша - то за чашей место должно быть свободно!
+                  (let ((too (cons (+ (car to) dx) (+ (cdr to) dy))))
+                     (and (eq? (level-at too) 0)
+                          (eq? (get gems (hash too) #false) #false)))
+                  ; иначе все ок
+                  #true)))))
       step-available))
 
 ; можно пройти (не толкая ничего, просто пройти)
 (define (move-available? from to)
-   (and
-      (not (has? (list gem-id gemH-id) (get-object (car to) (cdr to))))
-      (A* collision-data from to)))
+   (A* from to))
 
 ; init
 (glShadeModel GL_SMOOTH)
@@ -360,7 +385,10 @@
    (glEnable GL_BLEND)
 
    ; теперь попросим уровень отрисовать себя
-   (level:draw #false #null)
+;   (define gems (list
+;      (tuple '(0 . 1) (cons gem-id '(0 . 0)))))
+
+   (level:draw #false gems)
 
    ; окошки, консолька, etc.
    (render-windows)
@@ -442,14 +470,26 @@
                (let ((rel (cons
                         (- (car to) (car from))
                         (- (cdr to) (cdr from)))))
-;                     (print "object-to: " (get-object (car to) (cdr to)))
-                  (if (has? (list gem-id gemH-id) (get-object (car to) (cdr to)))
-                     (begin
-                        (set-object (+ (car to) (car rel)) (+ (cdr to) (cdr rel))
-                           (let ((background (level:get-layer 'background)))
-                              (if (eq? (lref (lref background (+ (cdr to) (cdr rel))) (+ (car to) (car rel))) grid-id)
-                                 gemH-id gem-id)))
-                        (set-object (car to) (cdr to) 0)))
+                  ; а не надо ли подвинуть чашу перед нами?
+                  (let loop ((gems gems))
+                     (cond
+                        ((null? gems) ; некого двигать
+                           #false)
+                        ((equal? (caar gems) to)
+                           ; хех, нашли чашу!
+                           ; давайте ее подвинем (мы уже раньше проверили, что ее можно двигать)
+                           (let ((x (+ (caaar gems) (car rel)))
+                                 (y (+ (cdaar gems) (cdr rel)))
+                                 (background (level:get-layer 'background)))
+                              (set-car! (caar gems) x)
+                              (set-cdr! (caar gems) y)
+                              ; заодно зажжем ее или потушим
+                              (print (car gems))
+                              (if (eq? (lref (lref background y) x) grid-id) ; если на решетке - зажжем
+                                 (set-cdr! (car gems) gemH-id)
+                                 (set-cdr! (car gems) gem-id))))
+                        (else
+                           (loop (cdr gems)))))
 
                   ; повернем героя в нужную сторону
                   (cond
@@ -466,7 +506,7 @@
                   (creature:move-with-animation 'hero rel 'run #f))
                ; иначе идем куда сказали
                (let loop ((from from))
-                  (let ((rel (A* collision-data from to)))
+                  (let ((rel (A* from to)))
                      (if rel ; если еще не пришли
                         ; повернем героя в нужную сторону
                         (begin
@@ -484,19 +524,13 @@
 
             ; а теперь проверка на выигрыш:
             ; todo: хорошо бы добавить еще и проверку на проигрыш...
-            (let ((win? (fold (lambda (f b o)
-                                 (fold (lambda (f b o)
-                                          (and f (if (eq? b grid-id)
-                                                   (eq? o gemH-id) #true)))
-                                    f b o))
-                           #true (level:get-layer 'background) (level:get-layer 'object))))
-               (if win?
-                  (begin
-                     (for-each (lambda ()
-                           (creature:play-animation 'hero 'cast 'cast))
-                        (iota 8))
-                     (print "SOMETHING!!"))
-                  (set-world-busy #false)))
+            ;  проверка теперь простая - что все gems "объекты" горят
+            (if (fold (lambda (r gem)
+                        (and r (eq? (cdr gem) gemH-id)))
+                  #true gems)
+               (fork (lambda ()
+                  (creature:play-animation 'hero 'cast 'cast)))
+               (set-world-busy #false))
             (this itself))
          (else
             (print "logic: unhandled event: " msg)
