@@ -27,8 +27,8 @@
 (import (lib gl2))
 (import (otus ffi))
 (import (lib soil))
-(print "---------------")
-(gl:set-window-title "Sokoban")
+
+(gl:set-window-title "Sokoban ...")
 
 ; -------------------------------------------------------
 ; теперь текстовая консолька
@@ -62,7 +62,8 @@
 
 ; =============================
 ; 1. Загрузим игровой уровень
-(level:load (or (lref *vm-args* 1) "001"))
+(define level-name (or (lref *vm-args* 1) "001"))
+(level:load level-name)
 
 ; временная функция работы с level-collision
 (define collision-data (level:get-layer 'collision))
@@ -74,21 +75,7 @@
 (define collision-data-at (lambda (xy)
    (ref (ref collision-data (+ (cdr xy) 1)) (+ (car xy) 1))))
 
-; временная функция: возвращает collision data
-;  по координатам x,y на карте
-;(define (at x y)
-;   (if (and (< -1 x W) (< -1 y H))
-;      (lref (lref collision-data y) x)))
-
-(define object-data (level:get-layer 'object))
-; временная функция для стирания объекта с карты
-(define (set-object x y id)
-   (if (and (< -1 x W) (< -1 y H))
-      (let loop ((p (lref object-data y)) (x x))
-         (if (eq? x 0)
-            (set-car! p id)
-            (loop (cdr p) (- x 1))))))
-
+; настройки уровня:
 (define setup-data (level:get-layer 'setup))
 ; номера жаровни, горящей жаровни, решетки
 (define grid-id (lref (lref setup-data 0) 0))
@@ -107,11 +94,7 @@
                         (cons (cons (cons x y) o) L)
                         L))
                L line (iota W)))
-      #null object-data (iota H)))
-; и поудаляем их из уровня карты
-(for-each (lambda (o)
-      (set-object (caar o) (cdar o) 0))
-   gems)
+      #null (cdr setup-data) (iota (- H 1) 1)))
 
 ; =================================================================
 ; A*
@@ -217,9 +200,10 @@
 ; зададим позицию героя в мире (найдем его в сетапе)
 (creature:set-location 'hero
    (call/cc (lambda (return)
+      (define used (list 0 gem-id gemH-id))
       (map (lambda (y row)
                (map (lambda (x id)
-                        (unless (eq? id 0)
+                        (unless (has? used id)
                            (return (cons x y))))
                   (iota W) row))
          (iota (- H 1) 1) ; skip first line (with row id's data)
@@ -270,14 +254,14 @@
                       (+ cx width) (+ cy height)))
 
 (define (resize scale) ; изменение масштаба
-   (let*((x (floor (/ (+ (ref window 3) (ref window 1)) 2)))
-         (w (floor (* (- (ref window 3) (ref window 1)) (/ scale 2))))
-         (y (floor (/ (+ (ref window 4) (ref window 2)) 2)))
-         (h (floor (* (- (ref window 4) (ref window 2)) (/ scale 2)))))
-      (set-ref! window 1 (- x w))
-      (set-ref! window 2 (- y h))
-      (set-ref! window 3 (+ x w))
-      (set-ref! window 4 (+ y h))))
+   (let*((x (/ (+ (ref window 3) (ref window 1)) 2))
+         (w (* (- (ref window 3) (ref window 1)) (/ scale 2)))
+         (y (/ (+ (ref window 4) (ref window 2)) 2))
+         (h (* (- (ref window 4) (ref window 2)) (/ scale 2))))
+      (set-ref! window 1 (floor (- x w)))
+      (set-ref! window 2 (floor (- y h)))
+      (set-ref! window 3 (floor (+ x w)))
+      (set-ref! window 4 (floor (+ y h)))))
 
 (define (move dx dy) ; сдвинуть окно
    (let*((x (floor (* (- (ref window 3) (ref window 1)) 0.01)))
@@ -349,6 +333,8 @@
 
 ; служебные переменные
 (define timestamp (box 0))
+
+(gl:set-window-title (string-append "Sokoban " level-name))
 
 ; draw
 (gl:set-renderer (lambda (mouse)
@@ -488,64 +474,70 @@
       (tuple-case msg
          ((move to)
             (define from (creature:get-location 'hero))
-            ; сюда мы попадем либо если можно пойти на соседнее поле (возможно, с толчком чаши), либо вообще пойти куда-то
-            (if (step-available? from to)
-               (let ((rel (cons
-                        (- (car to) (car from))
-                        (- (cdr to) (cdr from)))))
+            (cond
+               ((equal? from to) ; если тыкнули на себя
+                  (creature:play-animation 'hero 'block #f))
+               ; сюда мы попадем либо если можно пойти на соседнее поле (возможно, с толчком чаши), либо вообще пойти куда-то
+               ((step-available? from to)
+                  (let ((rel (cons
+                           (- (car to) (car from))
+                           (- (cdr to) (cdr from)))))
 
-                  ; повернем героя в нужную сторону
-                  (cond
-                     ((equal? rel '(0 . -1))
-                        (creature:set-orientation 'hero 0))
-                     ((equal? rel '(+1 . 0))
-                        (creature:set-orientation 'hero 2))
-                     ((equal? rel '(0 . +1))
-                        (creature:set-orientation 'hero 4))
-                     ((equal? rel '(-1 . 0))
-                        (creature:set-orientation 'hero 6)))
+                     ; повернем героя в нужную сторону
+                     (cond
+                        ((equal? rel '(0 . -1))
+                           (creature:set-orientation 'hero 0))
+                        ((equal? rel '(+1 . 0))
+                           (creature:set-orientation 'hero 2))
+                        ((equal? rel '(0 . +1))
+                           (creature:set-orientation 'hero 4))
+                        ((equal? rel '(-1 . 0))
+                           (creature:set-orientation 'hero 6)))
 
-                  ; а не надо ли подвинуть чашу перед нами?
-                  (if (or
-                        (let loop ((gems gems))
-                           (cond
-                              ((null? gems) ; некого двигать
-                                 #true)
-                              ((equal? (caar gems) to)
-                                 ; хех, нашли чашу!
-                                 ; давайте ее подвинем (мы уже раньше проверили, что ее можно двигать)
-                                 (let ((x (+ (caaar gems) (car rel)))
-                                       (y (+ (cdaar gems) (cdr rel)))
-                                       (background (level:get-layer 'background)))
-                                    (set-car! (caar gems) x)
-                                    (set-cdr! (caar gems) y)
-                                    ; заодно зажжем ее или потушим
-                                    (if (eq? (lref (lref background y) x) grid-id) ; если на решетке - зажжем
-                                       (set-cdr! (car gems) gemH-id)
-                                       (set-cdr! (car gems) gem-id)))
-                                 #false)
-                              (else
-                                 (loop (cdr gems)))))
-                        (config 'move-with-push))
-                  ; и пошлем его в дорогу (если некого двигать)
-                  (creature:move-with-animation 'hero rel 'run #f)))
-               ; иначе идем куда сказали
-               (let loop ((from from))
-                  (let ((rel (A* from to)))
-                     (if rel ; если еще не пришли
-                        ; повернем героя в нужную сторону
-                        (begin
-                           (cond
-                              ((equal? rel '(0 . -1))
-                                 (creature:set-orientation 'hero 0))
-                              ((equal? rel '(+1 . 0))
-                                 (creature:set-orientation 'hero 2))
-                              ((equal? rel '(0 . +1))
-                                 (creature:set-orientation 'hero 4))
-                              ((equal? rel '(-1 . 0))
-                                 (creature:set-orientation 'hero 6)))
-                           (creature:move-with-animation 'hero rel 'run #f)
-                           (loop (creature:get-location 'hero)))))))
+                     ; а не надо ли подвинуть чашу перед нами?
+                     (if (or
+                           (let loop ((gems gems))
+                              (cond
+                                 ((null? gems) ; некого двигать
+                                    #true)
+                                 ((equal? (caar gems) to)
+                                    ; хех, нашли чашу!
+                                    ; давайте ее подвинем (мы уже раньше проверили, что ее можно двигать)
+                                    (let ((x (+ (caaar gems) (car rel)))
+                                          (y (+ (cdaar gems) (cdr rel)))
+                                          (background (level:get-layer 'background)))
+                                       (set-car! (caar gems) x)
+                                       (set-cdr! (caar gems) y)
+                                       ; заодно зажжем ее или потушим
+                                       (if (eq? (lref (lref background y) x) grid-id) ; если на решетке - зажжем
+                                          (set-cdr! (car gems) gemH-id)
+                                          (set-cdr! (car gems) gem-id)))
+                                    ; если никуда не идем - то проиграем анимацию?
+                                    (creature:play-animation 'hero 'cast #f)
+                                    #false)
+                                 (else
+                                    (loop (cdr gems)))))
+                           (config 'move-with-push))
+                     ; и пошлем его в дорогу (если некого двигать)
+                     (creature:move-with-animation 'hero rel 'run #f))))
+               (else
+                  ; иначе идем куда сказали
+                  (let loop ((from from))
+                     (let ((rel (A* from to)))
+                        (if rel ; если еще не пришли
+                           ; повернем героя в нужную сторону
+                           (begin
+                              (cond
+                                 ((equal? rel '(0 . -1))
+                                    (creature:set-orientation 'hero 0))
+                                 ((equal? rel '(+1 . 0))
+                                    (creature:set-orientation 'hero 2))
+                                 ((equal? rel '(0 . +1))
+                                    (creature:set-orientation 'hero 4))
+                                 ((equal? rel '(-1 . 0))
+                                    (creature:set-orientation 'hero 6)))
+                              (creature:move-with-animation 'hero rel 'run #f)
+                              (loop (creature:get-location 'hero))))))))
 
             ; а теперь проверка на выигрыш:
             ; todo: хорошо бы добавить еще и проверку на проигрыш...
@@ -553,7 +545,9 @@
             (if (fold (lambda (r gem)
                         (and r (eq? (cdr gem) gemH-id)))
                   #true gems)
-               (creature:play-animation 'hero 'cast 'die)
+               (begin
+                  (creature:play-animation 'hero 'block 'die)
+                  (gl:set-window-title "YOU WIN!!"))
                (set-world-busy #false))
             (this itself))
          (else
