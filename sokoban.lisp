@@ -1,4 +1,17 @@
 #!/usr/bin/ol
+; правила создания уровней:
+; * уровень должен содержать 4 слоя, в порядке снизу-вверх
+;   4) background, слой в котором нарисована "земля"
+;   3) object, слой с недвижимыми игровыми объектами
+;   2) setup, слой с движимыми игровыми объектами, причем
+;     * первая строка слоя - настроечная и не отображается/не просчитывается, в ней в первых трех клетках должны быть записаны "настроечные" тайлы:
+;       * в клетке (0,0) - "место": место, куда надо поставить "чаши"
+;       * в клетке (1,0) - "чаша" : предмет, который должен двигать игрок и который надо в процессе игры установить на какое-нибудь из "мест"
+;       * в клетке (2,0) - "горящая чаша": "чаша", которую должен двигать игрок и которая сигнализирует, что она уже стоит на "месте"
+;     * остальные строки уровня - "рабочие", в них расставляются "чаши", "горящие чаши", если есть и ставится игрок на клетку, с которой начинается игра
+;     * обратите внимание, что тайл "игрока" на карте, это всегда первый тайл слоя с анимацией игрока; таким образом если в карту включено три анимированных слоя "skeleton", "antlion", "wyvern" - то можно просто сменив тайл игрока на первый из этих трех сменить самого игрока со скелетона, например, на виверну.
+;   1) collision, слой в котором записаны возможные для движения игрока (и установки "чаши") тайлы; причем пустой тайл означает возможность использования тайла, любой не пустой - запрет.
+;     * на этот слой накладывается условие - из тайла в котором стоит игрок НЕ должно быть выхода за границу карты.
 (import
    (lib math) (otus random!)
    (lang sexp) (scheme misc)
@@ -32,12 +45,13 @@
 
 ; -------------------------------------------------------
 ; теперь текстовая консолька
-#|(import (lib gl console))
+(import (lib gl console))
 
 ; окно дебага (покажем fps):
-(define fps (create-window 70 24 10 1))
+(define fps (create-window 60 24 10 1))
 (define started (time-ms)) (define time '(0))
 (define frames '(0 . 0))
+(define steps (box 0))
 
 (set-window-writer fps (lambda (print)
    (set-car! frames (+ (car frames) 1))
@@ -47,8 +61,40 @@
             (set-cdr! frames (car frames))
             (set-car! frames 0)
             (set-car! time (- now started)))))
+   (print WHITE (car steps) " steps,  ")
    (print GRAY (cdr frames) " fps")
-))|#
+))
+
+(define notes (create-window 3 2 40 2))
+
+(define messages (list->ff `(
+   (1 . (,GRAY "Нажмите Q для выхода, Z для отмены хода."))
+   (2 . (,LIGHTGREEN "Вы выиграли!"))
+)))
+(define notes-message (box 1))
+(set-window-writer notes (lambda (print)
+   (apply print (messages (car notes-message)))
+))
+
+
+; -----------------------------
+; список отмены ходов
+; сюда записывается кто и куда переместился
+(fork-server 'stash (lambda ()
+   (let this ((itself #null))
+   (let*((envelope (wait-mail))
+         (sender msg envelope))
+      (tuple-case msg
+         ((push message)
+            (this (cons message itself)))
+         ((pop)
+            (case itself
+               (#null
+                  (mail sender (tuple 'empty))
+                  (this #null))
+               (else
+                  (mail sender (car itself))
+                  (this (cdr itself))))))))))
 
 ; -=( level )=-----------------
 ;     заведует игровой картой
@@ -215,7 +261,7 @@
    (call/cc (lambda (return)
       (for-each (lambda (gid)
          (print "gid: " gid)
-         (if (>= hero-id (cdr gid))
+         (if (= hero-id (cdr gid))
             (return (car gid))))
          (reverse (ff->list (interact 'level (tuple 'get 'gids))))))))
 (print "hero-name: " hero-name)
@@ -392,7 +438,7 @@
    (level:draw #false gems)
 
    ; окошки, консолька, etc.
-   ;(render-windows)
+   (render-windows)
 
    ; let's draw mouse pointer
    (define from (creature:get-location 'hero))
@@ -443,6 +489,8 @@
 (gl:set-keyboard-handler (lambda (key)
    (print "key: " key)
    (case key
+      (vkZ
+         (mail 'game (tuple 'undo)))
       (vkQ
          ;(mail 'music (tuple 'shutdown))
          (halt 1))))) ; q - quit
@@ -468,6 +516,17 @@
    (let*((envelope (wait-mail))
          (sender msg envelope))
       (tuple-case msg
+         ((undo)
+            (tuple-case (interact 'stash (tuple 'pop))
+               ; простое перемещение по маршруту
+               ((move step from to)
+                  (creature:set-location 'hero from))
+               ((push step id from gem)
+                  (set-car! (car gem) (car from))
+                  (set-cdr! (car gem) (cdr from))
+                  (set-cdr! gem id))
+               (else #false))
+            (this itself))
          ((move to)
             (define from (creature:get-location 'hero))
             (cond
@@ -498,6 +557,8 @@
                                     #true)
                                  ((equal? (caar gems) to)
                                     ; хех, нашли чашу!
+                                    (mail 'stash (tuple 'push
+                                       (tuple 'push (car steps) (cdar gems) to (car gems))))
                                     ; давайте ее подвинем (мы уже раньше проверили, что ее можно двигать)
                                     (let ((x (+ (caaar gems) (car rel)))
                                           (y (+ (cdaar gems) (cdr rel)))
@@ -508,16 +569,21 @@
                                        (if (eq? (lref (lref background y) x) grid-id) ; если на решетке - зажжем
                                           (set-cdr! (car gems) gemH-id)
                                           (set-cdr! (car gems) gem-id)))
-                                    ; если никуда не идем - то проиграем анимацию?
                                     (creature:play-animation 'hero 'cast #f)
+                                    (set-car! steps (+ (car steps) 1))
                                     #false)
                                  (else
                                     (loop (cdr gems)))))
                            (config 'move-with-push))
                      ; и пошлем его в дорогу (если некого двигать)
-                     (creature:move-with-animation 'hero rel 'run #f))))
+                     (begin
+                        (mail 'stash (tuple 'push (tuple 'move (car steps) from to)))
+                        (creature:move-with-animation 'hero rel 'run #f)
+                        (set-car! steps (+ (car steps) 1))))))
                (else
                   ; иначе идем куда сказали
+                  ; но сначала запишем этот ход в список
+                  (mail 'stash (tuple 'push (tuple 'move (car steps) from to)))
                   (let loop ((from from))
                      (let ((rel (A* from to)))
                         (if rel ; если еще не пришли
@@ -533,6 +599,7 @@
                                  ((equal? rel '(-1 . 0))
                                     (creature:set-orientation 'hero 6)))
                               (creature:move-with-animation 'hero rel 'run #f)
+                              (set-car! steps (+ (car steps) 1))
                               (loop (creature:get-location 'hero))))))))
 
             ; а теперь проверка на выигрыш:
@@ -543,6 +610,7 @@
                   #true gems)
                (begin
                   (creature:play-animation 'hero 'block 'die)
+                  (set-car! notes-message 2)
                   (gl:set-window-title "YOU WIN!!"))
                (set-world-busy #false))
             (this itself))
