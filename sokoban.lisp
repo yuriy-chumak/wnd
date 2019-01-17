@@ -65,7 +65,7 @@
    (print GRAY (cdr frames) " fps")
 ))
 
-(define notes (create-window 3 2 40 2))
+(define notes (create-window 3 24 40 2))
 
 (define messages (list->ff `(
    (1 . (,GRAY "Нажмите Q для выхода, Z для отмены хода."))
@@ -278,14 +278,14 @@
 ; окно, через которое мы смотрим на мир
 ; todo: отцентрируем его на героя
 
-(define tile (creature:get-location 'hero))
+(define tile (cons (floor (/ W 2)) (floor (/ H 2))));(creature:get-location 'hero))
 (define w (level:get 'tilewidth))
 (define h (level:get 'tileheight))
 (define cx (- (* (car tile) (/ w 2)) (* (cdr tile) (/ w 2))))
 (define cy (+ (* (car tile) (/ h 2)) (* (cdr tile) (/ h 2))))
 
-(define width (* w 8))
-(define height (* h 8))
+(define width (* w (max W H)))
+(define height (* h (max W H)))
 
 (print "tile: " tile)
 (print "cx: " cx ", cy: " cy)
@@ -313,7 +313,7 @@
       (set-ref! window 3 (+ (ref window 3) (* dx x)))
       (set-ref! window 4 (- (ref window 4) (* dy y)))))
 
-(resize 0.6)
+(resize 0.4)
 
 ; функция перевода экранных координат в номер тайла, на который они попадают
 (define (xy:screen->tile xy)
