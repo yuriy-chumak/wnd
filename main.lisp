@@ -134,7 +134,7 @@
 
 ; =============================
 ; 1. Загрузим игровой уровень
-(level:load "river_encampment")
+(level:load "river_encampment.tmx")
 
 ; временная функция работы с level-collision
 (define collision-data (level:get-layer 'collision))

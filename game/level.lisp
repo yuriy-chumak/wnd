@@ -66,7 +66,7 @@
             ; загрузить новую карту
             ((load filename)
                (for-each display (list "Loading new level '" filename "'... "))
-               (define xml (xml-parse-file (string-append filename ".tmx")))
+               (define xml (xml-parse-file filename))
                (define level (car (xml-get-value xml))) ; use <map>
                (print "ok.")
 

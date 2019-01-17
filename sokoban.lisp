@@ -104,7 +104,7 @@
 
 ; =============================
 ; 1. Загрузим игровой уровень
-(define level-name (or (lref *vm-args* 1) "001"))
+(define level-name (or (lref *vm-args* 1) "001.tmx"))
 (level:load level-name)
 
 ; временная функция работы с level-collision
