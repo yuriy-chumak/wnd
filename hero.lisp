@@ -129,6 +129,55 @@
 )
 (задати-підказку 0)
 
+; ...
+; custom "message box" function:
+(define (message-box title text options handler)
+   ; for now - two buttons
+   (define box (create-window 30 10 20 5))
+   (define ok (create-window 33 13 4 1))
+   (define cancel (create-window 39 13 8 1))
+   (define selection '(0 . 2))
+
+   (set-window-background box GRAY)
+   (set-window-border box WHITE)
+
+   (set-car! selection 0) ; todo: get "default button" from options
+   (set-window-background ok RED)
+   (set-window-background cancel GRAY)
+
+   ; save old handlers
+   (define old-mouse-handler (interact 'opengl (tuple 'get 'mouse-handler)))
+   (define old-keyboard-handler (interact 'opengl (tuple 'get 'keyboard-handler)))
+
+   (set-window-writer box (lambda (write)
+      (write "\n  " text)
+   ))
+   (set-window-writer ok (lambda (write) (write " Ok ")))
+   (set-window-writer cancel (lambda (write) (write " Cancel ")))
+
+   (gl:set-keyboard-handler (lambda (key)
+      (case key
+         (vkLeft
+            (set-car! selection (mod (+ (car selection) 1) 2))
+            (set-window-background ok (if (zero? (car selection)) RED GRAY))
+            (set-window-background cancel (if (zero? (car selection)) GRAY RED)))
+         (vkRight
+            (set-car! selection (mod (+ (car selection) 1) 2))
+            (set-window-background ok (if (zero? (car selection)) RED GRAY))
+            (set-window-background cancel (if (zero? (car selection)) GRAY RED)))
+         (vkEnter
+            (for-each destroy-window (list ok cancel box))
+            (gl:set-keyboard-handler old-keyboard-handler)
+            (gl:set-mouse-handler old-mouse-handler)
+
+            (handler (zero? (car selection)))))))
+
+   (gl:set-mouse-handler (lambda (button x y)
+      #true))
+
+   #true)
+
+
 ; ==============================================================
 (gl:set-window-title "Чарівники і Дракони: створення персонажа")
 (gl:set-renderer (lambda (mouse)
@@ -142,14 +191,7 @@
    (case key
       (vkQ (halt vkQ))
       (vkEnter
-         (display "зберігаю налаштування в файл... ")
-         (print (if
-               (fasl-save (map (lambda (ff)
-                                 ((ff (car раса)) (car клас)))
-                  (list СИЛА ІНТЕЛЕКТ МУДРІСТЬ СПРИТНІСТЬ СТАТУРА ЧАРІВНІСТЬ ЗДОРОВЬЕ ОПЫТ ИНФРАЗРЕНИЕ))
-                  "hero.fasl")
-            "ok." "помилка"))
-         (halt vkEnter))
+         (mail 'game (tuple 'save)))
       (vkStar
          (set-car! клас (rand! (cdr клас)))
          (set-car! раса (rand! (cdr раса)))
@@ -202,3 +244,23 @@
          ('паладін   (set-car! клас 5) 2)
    ))
 ))
+
+(fork-server 'game (lambda ()
+   (let this ((itself #empty))
+      (let*((envelope (wait-mail))
+            (sender msg envelope))
+         (tuple-case msg
+            ((save)
+               (message-box "..." "Зберегти героя?" #f (lambda (ok)
+               (if ok (begin
+                  (display "зберігаю налаштування в файл... ")
+                  (print (if
+                        (fasl-save (map (lambda (ff)
+                                          ((ff (car раса)) (car клас)))
+                           (list СИЛА ІНТЕЛЕКТ МУДРІСТЬ СПРИТНІСТЬ СТАТУРА ЧАРІВНІСТЬ ЗДОРОВЬЕ ОПЫТ ИНФРАЗРЕНИЕ))
+                           "hero.fasl")
+                     "ok." "помилка"))
+                  (halt vkEnter)))))
+               (this itself))
+            (else
+               (this itself)))))))
