@@ -60,7 +60,7 @@
    ((check-mail) => (lambda (e) ; can be (and (eq? something 0) (check-mail)) =>
       (let*((sender msg e))
          ;(print "envelope: " envelope)
-         (tuple-case msg
+         (vector-case msg
             ; low level interface:
             ((set key value)
                (this (put dictionary key value)))

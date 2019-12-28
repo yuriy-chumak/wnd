@@ -21,9 +21,9 @@
 ; '(damage damage-level) - нанесение урона
 ;
 
-;; (define skeleton-state-machine (list->ff `(
+;; (define skeleton-state-machine (pairs->ff `(
 ;;    ; состояние "сплю"
-;;    (sleeping . ,(list->ff `(
+;;    (sleeping . ,(pairs->ff `(
 ;;       (tick . ,(lambda (itself creature)
 ;;          (print "'tick")
 ;;          (let*((started (time-ms))
@@ -43,7 +43,7 @@
 
 ;;             ;;    ; ждем 0.5 секунд, снова для теста
 ;;             ;;    ; todo: ...
-;;             ;;    ;(mail itself (tuple 'set 'state 'sleeping))
+;;             ;;    ;(mail itself (vector 'set 'state 'sleeping))
 ;;             ;;    (print "nothing...")
 ;;             ;;    (print sender)
 ;;             ;;    (mail sender #true)
@@ -62,12 +62,12 @@
 ;;             ; пока будем считать любой удар смертельным )
 ;;             (values itself 'dead)))))))
 ;;    ; режим преследования
-;;    (pursuit . ,(list->ff `(
+;;    (pursuit . ,(pairs->ff `(
 ;;       (tick . ,(lambda (itself creature)
 ;;          ; пускай наш дорогой скелет поищет путь к сундуку и попытается его достичь
 ;;          (define location (getf itself 'location)) ; текущее положение
-;;          (define chest (interact 'chest (tuple 'get-location))) ; положение сундука
-;;          ; moveq - возможное направление к сундуку, (tuple x y служебная-информация)
+;;          (define chest (interact 'chest (vector 'get-location))) ; положение сундука
+;;          ; moveq - возможное направление к сундуку, (vector x y служебная-информация)
 ;;          (define moveq
 ;;             (A* collision-data
 ;;                (car location) (cdr location)
@@ -96,7 +96,7 @@
 ;;          ; пока будем считать любой удар смертельным )
 ;;          (values itself 'dead))))))
 ;;    ; если умер, то умер :)
-;;    (dead . ,(list->ff '(
+;;    (dead . ,(pairs->ff '(
 ;;       (tick . ,(lambda ? (value itself 'dead)))
 ;;       (sound . ,(lambda ? (value itself 'dead)))
 ;;       (damage . ,(lambda ? (value itself 'dead)))))))))
@@ -104,7 +104,7 @@
 
 ;; (define skeleton-state-machine
 ;;    ; состояние "сплю"
-;;    (define (sleeping itself) (list->ff `(
+;;    (define (sleeping itself) (pairs->ff `(
 ;;       (tick . ,(lambda ()
 ;;          ; с некоторой вероятностью осмотреться, возможно.
 ;;          ; вернуть следующее состояние
@@ -121,12 +121,12 @@
 ;;             (values itself 'dead)))))))
 
 ;;    ; режим преследования
-;;    (define (pursuit itself) (list->ff `(
+;;    (define (pursuit itself) (pairs->ff `(
 ;;       (tick . ,(lambda ()
 ;;          ;; ; пускай наш дорогой скелет поищет путь к сундуку и попытается его достичь
 ;;          ;; (define location (getf itself 'location)) ; текущее положение
-;;          ;; (define chest (interact 'chest (tuple 'get-location))) ; положение сундука
-;;          ;; ; moveq - возможное направление к сундуку, (tuple x y служебная-информация)
+;;          ;; (define chest (interact 'chest (vector 'get-location))) ; положение сундука
+;;          ;; ; moveq - возможное направление к сундуку, (vector x y служебная-информация)
 ;;          ;; (define moveq
 ;;          ;;    (A* collision-data
 ;;          ;;       (car location) (cdr location)
@@ -156,13 +156,13 @@
 ;;          (values itself 'dead))))))
 
 ;;    ; если умер, то умер :)
-;;    (define (dead itself) (list->ff '(
+;;    (define (dead itself) (pairs->ff '(
 ;;       (dead . ,(lambda ()
 ;;          ; do nothing.
 ;;          (values itself 'dead))))))
 
 ;;    ; стейт-машина
-;;    (list->ff `(
+;;    (pairs->ff `(
 ;;       (sleeping . ,sleeping)
 ;;       (pursuit . ,pursuit)
 ;;       (dead . ,dead))))

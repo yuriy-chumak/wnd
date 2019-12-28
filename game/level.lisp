@@ -7,35 +7,40 @@
 ; public interface:
 
 ; загрузить уровень
+;  filename: имя xml файла в формате TILED
 (define (level:load filename)
-   (interact 'level (tuple 'load filename)))
+   (interact 'level (vector 'load filename)))
 
-; возращает характеристику уровня
+; получить характеристику уровня
 ; список:
 ;  'tileheight: высота тайла в пикселях
 ;  'tilewidth: ширина тайла в пикселях
 (define (level:get property)
-   (interact 'level (tuple 'get property)))
+   (interact 'level (vector 'get property)))
 
-; вернуть "слой" уровня по имени
+; получить слой уровня по имени
 (define (level:get-layer name)
-   (getf (interact 'level (tuple 'get 'layers)) name))
+   (getf (interact 'level (vector 'get 'layers)) name))
 
-; возвращает первый номер тайла, ассоциированный с тайлсетом name
+; получить первый номер тайла, ассоциированный с тайлсетом name
 (define (level:get-gid name)
-   (getf (interact 'level (tuple 'get 'gids)) name))
+   (getf (interact 'level (vector 'get 'gids)) name))
+
 ; возвращает количество тайлов в одной строке тайлсета name
 (define (level:get-columns name)
-   (getf (interact 'level (tuple 'get 'columns)) name))
+   (getf (interact 'level (vector 'get 'columns)) name))
 
 ; нарисовать уровень
+;  вызывать только изнутри цикла рендеринга
+;  mouse - тайл под курсором
+;  creatures - кого рисуем
 (define (level:draw mouse creatures)
-   (interact 'level (tuple 'draw mouse creatures)))
+   (interact 'level (vector 'draw mouse creatures)))
 
 
 ; -------------------------------
 ; что касается "занятости" мира расчетами
-(define *calculating* (box #false)) ; внутренняя переменная
+(setq *calculating* (box #f)) ; внутренняя переменная
 (define (set-world-busy busy)
    (set-car! *calculating* busy))
 (define (world-busy?)
@@ -43,28 +48,28 @@
 
 ; -----------------------------------------------
 ; helper functions
-(define split-by-comma (string->regex "c/,/"))
-(define split-by-newline (string->regex "c/\n/"))
+(setq split-by-comma (string->regex "c/,/"))
+(setq split-by-newline (string->regex "c/\n/"))
 
-; игровой уровень
+; гравная сопрограмму управления игровым уровнем
 (fork-server 'level (lambda ()
    (let this ((itself #empty))
       (let*((envelope (wait-mail))
             (sender msg envelope))
-         (tuple-case msg
+         (case msg
             ; low level interaction interface
-            ((set key value)
+            (['set key value]
                (let ((itself (put itself key value)))
                   (this itself)))
-            ((get key)
+            (['get key]
                (mail sender (get itself key #false))
                (this itself))
-            ((debug)
+            (['debug]
                (mail sender itself)
                (this itself))
 
             ; загрузить новую карту
-            ((load filename)
+            (['load filename]
                (for-each display (list "Loading new level '" filename "'... "))
                (define xml (xml-parse-file filename))
                (define level (car (xml-get-value xml))) ; use <map>
@@ -82,12 +87,12 @@
 
                (define tilesets (xml-get-subtags level 'tileset))
 
-               (define gids (list->ff (map (lambda (tileset)
+               (define gids (pairs->ff (map (lambda (tileset)
                      (cons
                         (string->symbol (xml-get-attribute tileset 'name "noname"))
                         (string->number (xml-get-attribute tileset 'firstgid "0") 10)))
                   tilesets)))
-               (define columns (list->ff (map (lambda (tileset)
+               (define columns (pairs->ff (map (lambda (tileset)
                      (cons
                         (string->symbol (xml-get-attribute tileset 'name "noname"))
                         (/;(string->number (xml-get-attribute tileset 'columns "0") 10)) <- old code
@@ -125,7 +130,7 @@
                                     (map (lambda (col)
                                           (let ((ul_x (* col tile-width))
                                                 (ul_y (* row tile-height)))
-                                             (tuple
+                                             (vector
                                                 id ; texture id
                                                 tile-width
                                                 tile-height
@@ -138,7 +143,7 @@
                                                    (/ (+ ul_y tile-height) image-height)))))
                                        (iota columns)))
                                  (iota (/ tile-count columns)))))
-                           (list->ff (map cons
+                           (pairs->ff (map cons
                                  (iota (length tiles) first-gid)
                                  tiles))))
                      tilesets)))
@@ -167,7 +172,7 @@
                   (layers . ,layers)))))
 
             ; draw the level on the screen
-            ((draw mouse creatures); interact
+            (['draw mouse creatures]; interact
                (let ((w (getf itself 'tilewidth))
                      (h (getf itself 'tileheight))
                      (width (getf itself 'width))
@@ -247,8 +252,8 @@
                   ;   рисовать мы их будем все вместе - слой "object" и наших creatures
                   (define object-data ((itself 'layers) 'object))
                   (draw-layer object-data (append creatures (list
-                     (tuple (interact 'hero (tuple 'get-location))
-                            (interact 'hero (tuple 'get-animation-frame)))
+                     (vector (interact 'hero (vector 'get-location))
+                            (interact 'hero (vector 'get-animation-frame)))
                   )))
 
                   (mail sender 'ok)

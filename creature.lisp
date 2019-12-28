@@ -3,30 +3,30 @@
 
 ; поместить создание на карту
 (define (creature:set-location creature location)
-   (mail creature (tuple 'set-location location)))
+   (mail creature (vector 'set-location location)))
 ; получить положение создания
 (define (creature:get-location creature)
-   (interact creature (tuple 'get 'location)))
+   (interact creature (vector 'get 'location)))
 
 ; задать поворот в пространстве
 (define (creature:set-orientation creature orientation)
-   (mail creature (tuple 'set-orientation orientation)))
+   (mail creature (vector 'set-orientation orientation)))
 
 ; задать созданию набор анимаций (тайлсет, конфигурационный файл)
 (define (creature:set-animations creature name inifile)
-   (mail creature (tuple 'set-animations name inifile)))
+   (mail creature (vector 'set-animations name inifile)))
 
 ; выбрать созданию текущую анимацию по ее имени
 (define (creature:set-current-animation creature animation)
-   (interact creature (tuple 'set-current-animation animation)))
+   (interact creature (vector 'set-current-animation animation)))
 
 (define (creature:set-next-location creature location)
-   (mail creature (tuple 'set-next-location location)))
+   (mail creature (vector 'set-next-location location)))
 
 ; отыграть цикл анимации (с ожиданием)
 (define (creature:play-animation creature animation next-animation)
    (let ((started (time-ms))
-         (saved-animation (or next-animation (interact creature (tuple 'get 'animation))))
+         (saved-animation (or next-animation (interact creature (vector 'get 'animation))))
          (duration (creature:set-current-animation creature animation)))
       (let loop ((unused #f))
          ;(print creature ": waiting for " (- (time-ms) started))
@@ -39,7 +39,7 @@
 ; двигаться (с анимацией)
 (define (creature:move-with-animation creature move animation next-animation)
    (let ((started (time-ms))
-         (saved-animation (or next-animation (interact creature (tuple 'get 'animation))))
+         (saved-animation (or next-animation (interact creature (vector 'get 'animation))))
          (location (creature:get-location creature))
          (duration (creature:set-current-animation creature animation)))
       (creature:set-next-location creature move)
@@ -61,19 +61,19 @@
    (let this ((itself #empty))
       (let*((envelope (wait-mail))
             (sender msg envelope))
-         (tuple-case msg
+         (case msg
             ; low level interaction interface
-            ((set key data)
+            (['set key data]
                (let ((itself (put itself key data)))
                   (this itself)))
-            ((get key)
+            (['get key]
                (mail sender (get itself key #false))
                (this itself))
-            ((debug)
+            (['debug]
                (mail sender itself)
                (this itself))
 
-            ((ready?)
+            (['ready?]
                ; вот тут надо посетить каждого из npc и просто сделать ему interact,
                ; это позволит убедиться, что все npc закончили обдумывать свои дела
                ; и их наконец то можно рисовать
@@ -81,9 +81,9 @@
                   (ff-fold (lambda (* key value)
                               (cond
                                  ((list? value)
-                                    (for-each (lambda (id) (interact id (tuple 'debug))) value))
+                                    (for-each (lambda (id) (interact id (vector 'debug))) value))
                                  ((symbol? value)
-                                    (interact value (tuple 'debug)))
+                                    (interact value (vector 'debug)))
                                  (else
                                     (print "unknown creature: " value)))
                               #true)
@@ -97,7 +97,7 @@
 
 ; --------------------------
 ; имеет отношение к анимации:
-(define orientations (list->ff `(
+(define orientations (pairs->ff `(
    (0 . 3) ; top
    (1 . 4) ; top-right
    (2 . 5) ; right
@@ -116,14 +116,14 @@
    (let this ((itself initial))
    (let*((envelope (wait-mail))
          (sender msg envelope))
-      (tuple-case msg
+      (case msg
          ; low level interaction interface
-         ((set key value)
+         (['set key value]
             (this (put itself key value)))
-         ((get key)
+         (['get key]
             (mail sender (get itself key #false))
             (this itself))
-         ((debug)
+         (['debug]
             (mail sender itself)
             (this itself))
 
@@ -131,13 +131,13 @@
          ; блок обработки анимации
          ; set animation
          ;  задать имя тайловой карты и конфигурационный файл анимаций персонажа
-         ((set-animations name ini)
+         (['set-animations name ini]
             (let*((itself (put itself 'fg (level:get-gid name)))
-                  (itself (put itself 'animations (list->ff (ini-parse-file ini))))
+                  (itself (put itself 'animations (pairs->ff (ini-parse-file ini))))
                   (itself (put itself 'columns (level:get-columns name))))
                (this itself)))
 
-         ((set-current-animation animation)
+         (['set-current-animation animation]
             ; set current animation (that will be changed, or not to default)
             ; return animation cycle time (for feature use by caller)
             (let*((itself (put itself 'animation animation))
@@ -161,7 +161,7 @@
                            (* 100 frames))
                   ))
                (this itself)))
-         ((get-animation-frame)
+         (['get-animation-frame]
             ; todo: change frames count according to animation type (and fix according math)
             (let*((animation (get itself 'animation 'stance)) ; соответствующая состояния анимация
                   (ssms (- (time-ms) (get itself 'ssms 0))) ; количество ms с момента перехода в анимацию
@@ -210,14 +210,14 @@
             (this itself))
 
          ; ---------------------------------------------
-         ((set-location xy)
+         (['set-location xy]
             (let*((itself (put itself 'location xy))
                   (itself (del itself 'next-location)))
                (this itself)))
-         ((set-next-location xy)
+         (['set-next-location xy]
             (let*((itself (put itself 'next-location xy)))
                (this itself)))
-         ((set-orientation orientation)
+         (['set-orientation orientation]
             (let*((itself (put itself 'orientation orientation)))
                (this itself)))
 
@@ -233,7 +233,7 @@
          ;;          (itself (put itself 'orientation orientation)))
          ;;       (this itself)))
 
-         ((get-location)
+         (['get-location]
             (mail sender (get itself 'location '(0 . 0)))
             (this itself))
 
@@ -273,14 +273,14 @@
          (else
             (print "unhandled event: " msg)
             (this itself)))))))
-   (define creature (list->ff (list
-      (cons 'set-location (lambda (location)
-         (creature:set-location name location)))
-      (cons 'get-location (lambda ()
-         (creature:get-location name)))
-      (cons 'set-orientation (lambda (orientation)
-         (creature:set-orientation name orientation)))
-      )))
-   (mail 'creatures (tuple 'set name creature))
+   (define creature {
+      'set-location (lambda (location)
+         (creature:set-location name location))
+      'get-location (lambda ()
+         (creature:get-location name))
+      'set-orientation (lambda (orientation)
+         (creature:set-orientation name orientation))
+   })
+   (mail 'creatures (vector 'set name creature))
    creature)
 

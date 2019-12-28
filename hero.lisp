@@ -19,7 +19,7 @@
 (define-library (lib gl config)
 (export config) (import (otus lisp))
 (begin
-   (define config (list->ff `(
+   (define config (pairs->ff `(
       ; размеры окна в знакоместах:
       ; напомню, что мы используем фиксированный шрифт размера 9*16
       (width . ,(* 80 9))
@@ -77,7 +77,7 @@
    (C 4) (write 'карлик "e) Карлик\n" #f)
    (C 5) (write 'гном "f) Гном\n" #f)
    (C 6) (write 'напіворк "g) Напіворк\n" #f)
-   (C 7) (write 'напівтроль"h) Напівтроль\n" #f)
+   (C 7) (write 'напівтроль "h) Напівтроль\n" #f)
    (C 8) (write 'дунадан "i) Дунадан\n" #f)
    (C 9) (write 'високий-ельф "j) Високий Ельф\n" #f)
    (C 10) (write 'кобольд "k) Кобольд" #f)
@@ -146,8 +146,8 @@
    (set-window-background cancel GRAY)
 
    ; save old handlers
-   (define old-mouse-handler (interact 'opengl (tuple 'get 'mouse-handler)))
-   (define old-keyboard-handler (interact 'opengl (tuple 'get 'keyboard-handler)))
+   (define old-mouse-handler (interact 'opengl (vector 'get 'mouse-handler)))
+   (define old-keyboard-handler (interact 'opengl (vector 'get 'keyboard-handler)))
 
    (set-window-writer box (lambda (write)
       (write "\n  " text)
@@ -191,7 +191,7 @@
    (case key
       (vkQ (halt vkQ))
       (vkEnter
-         (mail 'game (tuple 'save)))
+         (mail 'game (vector 'save)))
       (vkStar
          (set-car! клас (rand! (cdr клас)))
          (set-car! раса (rand! (cdr раса)))
@@ -249,7 +249,7 @@
    (let this ((itself #empty))
       (let*((envelope (wait-mail))
             (sender msg envelope))
-         (tuple-case msg
+         (vector-case msg
             ((save)
                (message-box "..." "Зберегти героя?" #f (lambda (ok)
                (if ok (begin

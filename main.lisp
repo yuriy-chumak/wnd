@@ -12,27 +12,23 @@
 (define-library (lib gl config)
 (export config) (import (otus lisp))
 (begin
-   (define config (list->ff `(
+   (define config (pairs->ff `(
       ; напомню, что мы используем фиксированный шрифт размера 9*16
-      (width  . ,(* 2  9 80))      ; 80 знакомест в ширину
-      (height . ,(* 2 16 25))))))) ; 25 знакомест в высоту
+      (width  . ,(* 1  9 80))      ; 80 знакомест в ширину
+      (height . ,(* 1 16 25))))))) ; 25 знакомест в высоту
 (import (lib gl config))
 
 ; игра пошаговая! посему все ходы только после клика "я готов" (пока это ПКМ) и все НПС
 ; должны ходить по-очереди. при этом демонстрировать что они делают.
-(define screen-width (config 'width))
-(define screen-height (config 'height))
 
 ; -=( main )=------------------------------------
 ; подключаем графические библиотеки, создаем окно
 (import (lib gl2))
+(gl:set-window-title "Wizards and Dragons")
 (import (otus ffi))
 (import (lib soil))
-(print "---------------")
-(gl:set-window-title "Wizards and Dragons")
 
-; --------------------------------------------------------------------------------------------
-; сразу нарисуем сплеш
+; -=( сразу нарисуем сплеш )=---------------------------
 (glOrtho 0 1 1 0 0 1)
 (glEnable GL_TEXTURE_2D)
 (define id ; OpenGL texture splash ID
@@ -46,14 +42,14 @@
       '((0 . 0) (1 . 0) (1 . 1) (0 . 1)))
 (glEnd)
 (glDisable GL_TEXTURE_2D)
-(gl:SwapBuffers (interact 'opengl (tuple 'get 'context)))
+(gl:SwapBuffers (interact 'opengl (vector 'get 'context))) ; todo: make a function
 (glDeleteTextures 1 (list id)) ; и спокойно удалим сплеш текстуру
 
 ; -------------------------------------------------------
-; теперь текстовая консолька
+; теперь запустим текстовую консольку
 (import (lib gl console))
 
-; окно дебага (покажем fps):
+; временное окно дебага (покажем fps):
 (define fps (create-window 70 24 10 1))
 (define started (time-ms)) (define time '(0))
 (define frames '(0 . 0))
@@ -70,7 +66,7 @@
 ))
 
 ; информационное окно состояния героя
-(define info (create-window 0 1 12 24))
+(define info (create-window 0 1 11 24))
 (set-window-background info BLACK)
 (set-window-border info GRAY)
 (set-window-writer info (lambda (echo)
@@ -90,12 +86,12 @@
 
    (move-to 0 1)
    (echo LIGHTBLUE (case (list-ref характер 2)
-      (0 "Воїн")
+      (0 "Воин")
       (1 "Маг")
       (2 "Священник")
-      (3 "Крадій")
-      (4 "Слідопит")
-      (5 "Паладін")
+      (3 "Вор")
+      (4 "Следопыт")
+      (5 "Паладин")
       (else "unknown")))
 
    (move-to 0 2)
@@ -167,7 +163,7 @@
 (for-each (lambda (id)
       (make-creature id #empty)) ; создаем их
    monsters)
-(mail 'creatures (tuple 'set 'monsters monsters)) ; и сохраним в списке всех npc
+(mail 'creatures (vector 'set 'monsters monsters)) ; и сохраним в списке всех npc
 
 ; теперь поместим монстров в случайные места на карте
 (for-each (lambda (id)
@@ -187,11 +183,11 @@
 
 ;; ; зададим скелетонам машину состояний и пусть все пока спят
 ;; (for-each (lambda (id)
-;;       (mail id (tuple 'set 'state-machine default-mob-state-machine))) ; state machine
+;;       (mail id (vector 'set 'state-machine default-mob-state-machine))) ; state machine
 ;;    monsters)
 ;; ; set initial state
 ;; (for-each (lambda (id)
-;;       (mail id (tuple 'set 'state 'sleeping))) ; initial state
+;;       (mail id (vector 'set 'state 'sleeping))) ; initial state
 ;;    monsters)
 
 ; --------------------------------------------------------------------
@@ -222,11 +218,11 @@
    (let ((x1 (ref window 1)) (x2 (ref window 3))
          (y1 (ref window 2)) (y2 (ref window 4)))
    (let ((x2-x1 (- x2 x1)) (y2-y1 (- y2 y1))
-         (w screen-width) (h screen-height))
+         (w (ref gl:window-dimensions 3)) (h (ref gl:window-dimensions 4)))
    (let ((X (floor (+ x1 (/ (* (car xy) x2-x1) w))))
          (Y (floor (+ y1 (/ (* (cdr xy) y2-y1) h)))))
-   (let ((w (interact 'level (tuple 'get 'tilewidth)))
-         (h (interact 'level (tuple 'get 'tileheight))))
+   (let ((w (level:get 'tilewidth))
+         (h (level:get 'tileheight)))
    (let ((x (+ (/ X w) (/ Y h)))
          (y (- (/ Y h) (/ X w))))
       (cons (floor x) (floor y))))))))
@@ -283,8 +279,8 @@
             ;; ; события нипов пускай остаются асинхронными,
             ;; ; просто перед рисованием убедимся что они все закончили свою работу
             ;; (for-each (lambda (id)
-            ;;       (mail id (tuple 'process-event-transition-tick)))
-            ;;    (interact 'creatures (tuple 'get 'skeletons)))
+            ;;       (mail id (vector 'process-event-transition-tick)))
+            ;;    (interact 'creatures (vector 'get 'skeletons)))
          )))
 
    ; теперь можем и порисовать: очистим окно и подготовим оконную математику
@@ -297,8 +293,8 @@
 
    ; теперь попросим уровень отрисовать себя
    (define creatures (map (lambda (id)
-         (tuple (interact id (tuple 'get-location)) (interact id (tuple 'get-animation-frame))))
-      (interact 'creatures (tuple 'get 'monsters))))
+         (vector (interact id (vector 'get-location)) (interact id (vector 'get-animation-frame))))
+      (interact 'creatures (vector 'get 'monsters))))
 
    (level:draw (if mouse (xy:screen->tile mouse)) creatures)
 
@@ -308,15 +304,27 @@
    ; let's draw mouse pointer
    (if mouse
       (let*((ms (mod (floor (/ (time-ms) 100)) 40))
-            (tile (getf (interact 'level (tuple 'get 'tileset))
-               (unless (unbox calculating-world)
-                  (+ 1212 ms)
-                  (+ 1292 ms))))
+            (tile (getf (level:get 'tileset)
+                        (+ (level:get-gid 'pointer)
+                           (if (world-busy?) 1 0))))
+                           ;; (cond
+                           ;;    ((world-busy?) 1)
+                           ;;    ((let ((xy (xy:screen->tile mouse)))
+                           ;;       (and (< (car xy) (level:get 'width))
+                           ;;            (< (cdr xy) (level:get 'height))
+                           ;;            (>= (car xy) 0)
+                           ;;            (>= (cdr xy) 0)
+                           ;;            (A* collision-data xy (creature:get-location 'hero))))
+                           ;;       0)
+                           ;;    (else 3)))))
+                        ;; (unless (unbox calculating-world)
+                        ;;    (+ 1212 ms)
+                        ;;    (+ 1292 ms))))
             (w (/ (- (ref window 3) (ref window 1)) 48)) ;  размер курсора
             (st (ref tile 5))
             ; window mouse to opengl mouse:
-            (x (+ (ref window 1) (* (car mouse) (- (ref window 3) (ref window 1)) (/ 1 screen-width))))
-            (y (+ (ref window 2) (* (cdr mouse) (- (ref window 4) (ref window 2)) (/ 1 screen-height)))))
+            (x (+ (ref window 1) (* (car mouse) (- (ref window 3) (ref window 1)) (/ 1 (ref gl:window-dimensions 3)))))
+            (y (+ (ref window 2) (* (cdr mouse) (- (ref window 4) (ref window 2)) (/ 1 (ref gl:window-dimensions 4))))))
          (glEnable GL_TEXTURE_2D)
          (glEnable GL_BLEND)
          (glBindTexture GL_TEXTURE_2D (ref tile 1))
@@ -395,7 +403,7 @@
    (print "key: " key)
    (case key
       (#x18
-         ;(mail 'music (tuple 'shutdown))
+         ;(mail 'music (vector 'shutdown))
          (halt 1))))) ; q - quit
 
 (gl:set-mouse-handler (lambda (button x y)
@@ -405,12 +413,12 @@
          ((eq? button 1)
             (let ((tile (xy:screen->tile (cons x y))))
                (set-car! calculating-world 42)
-               (mail 'game (tuple 'run tile))))
+               (mail 'game (vector 'run tile))))
          ((eq? button 3) ; ПКМ
             (unless (unbox calculating-world) ; если мир сейчас не просчитывается (todo: оформить отдельной функцией)
                (begin
                   (set-car! calculating-world 42)
-                  (mail 'game (tuple 'turn)))))
+                  (mail 'game (vector 'turn)))))
          (else
             ; nothing
             #true))
@@ -420,7 +428,7 @@
    (let this ((itself #empty))
    (let*((envelope (wait-mail))
          (sender msg envelope))
-      (tuple-case msg
+      (vector-case msg
          ((turn)
             ; 1. Каждому надо выдать некотрое количество action-points (сколько действий он может выполнить за ход)
             ;  это, конечно же, зависит от npc - у каждого может быть разное
@@ -434,7 +442,7 @@
             (for-each (lambda (creature)
                   ; для тестов - пусть каждый скелет получает урон "-50"
                   (ai:make-action creature 'damage 50))
-               (interact 'creatures (tuple 'get 'skeletons)))
+               (interact 'creatures (vector 'get 'skeletons)))
             (print "turn done.")
 
             ; вроде все обработали, можно переходить в состояние "готов к следующему ходу"
@@ -443,16 +451,16 @@
          ((fire-in-the-tile xy)
             (for-each (lambda (creature)
                   ; для тестов - пусть каждый скелет получает урон "-50"
-                  (if (equal? (interact creature (tuple 'get 'location)) xy)
+                  (if (equal? (interact creature (vector 'get 'location)) xy)
                      (ai:make-action creature 'damage 50)))
-               (interact 'creatures (tuple 'get 'skeletons)))
+               (interact 'creatures (vector 'get 'skeletons)))
             (set-car! calculating-world #false)
             (this itself))
 
          ((run to)
             (let loop ()
                (let*((hero (creature:get-location 'hero))
-                     (move (A* collision-data (car hero) (cdr hero) (car to) (cdr to))))
+                     (move (A* collision-data hero to)))
                   (if move (begin
                      ; повернем героя в ту сторону, куда он собрался идти
                      (cond

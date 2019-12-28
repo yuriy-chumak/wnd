@@ -22,10 +22,10 @@
 (define-library (lib gl config)
 (export config) (import (otus lisp))
 (begin
-   (define config (list->ff `(
+   (define config (pairs->ff `(
       ; напомню, что мы используем фиксированный шрифт размера 9*16
-      (width  . ,(* 2  9 80))      ; 80 знакомест в ширину
-      (height . ,(* 2 16 25))      ; 25 знакомест в высоту
+      (width  . ,(* 1  9 80))      ; 80 знакомест в ширину
+      (height . ,(* 1 16 25))      ; 25 знакомест в высоту
       (move-with-push . #false)    ; двигаться ли вместе с толчком чаши
 )))))
 (import (lib gl config))
@@ -67,7 +67,7 @@
 
 (define notes (create-window 3 24 40 2))
 
-(define messages (list->ff `(
+(define messages (pairs->ff `(
    (1 . (,GRAY "Нажмите Q для выхода, Z для отмены хода."))
    (2 . (,LIGHTGREEN "Вы выиграли!"))
 )))
@@ -84,13 +84,13 @@
    (let this ((itself #null))
    (let*((envelope (wait-mail))
          (sender msg envelope))
-      (tuple-case msg
-         ((push message)
+      (case msg
+         (['push message]
             (this (cons message itself)))
-         ((pop)
+         (['pop]
             (case itself
                (#null
-                  (mail sender (tuple 'empty))
+                  (mail sender (vector 'empty))
                   (this #null))
                (else
                   (mail sender (car itself))
@@ -104,7 +104,7 @@
 
 ; =============================
 ; 1. Загрузим игровой уровень
-(define level-name (or (lref *vm-args* 1) "001.tmx"))
+(define level-name (or (lref *vm-args* 0) "001.tmx"))
 (level:load level-name)
 
 ; временная функция работы с level-collision
@@ -112,8 +112,8 @@
 
 (define H (length collision-data))       ; высота уровня
 (define W (length (car collision-data))) ; ширина уровня
-; а теперь подготовим collision-data к быстрой работе - превратим его в статический tuple
-(define collision-data (list->tuple (map list->tuple collision-data)))
+; а теперь подготовим collision-data к быстрой работе - превратим его в статический vector
+(define collision-data (list->vector (map list->vector collision-data)))
 (define collision-data-at (lambda (xy)
    (ref (ref collision-data (+ (cdr xy) 1)) (+ (car xy) 1))))
 
@@ -147,7 +147,7 @@
 (define (A* from to)
    (let*((xy from) ; начальное значение поиска пути
          ; для быстрого обращения к элементам карты сконвертируем ее из списка в кортеж
-         ; функция (list->tuple) реализована на стороне виртуальной машины, посему очень быстрая
+         ; функция (list->vector) реализована на стороне виртуальной машины, посему очень быстрая
          (level collision-data)
          ; получить значение из карты по координатам '(x.y), координаты начинаются с 0
          (level-at collision-data-at)
@@ -164,12 +164,12 @@
                (eq? (get gems (hash xy) #f) #f)))))
 
    (if (equal? from to) ; а никуда идти и не надо?
-      #false ;(tuple 0 0 #empty #empty)
+      #false ;(vector 0 0 #empty #empty)
    ; ищем без ограничений, это упростит алгоритм
    (let step1 ((c-list-set #empty)
-               (o-list-set (put #empty (hash xy)  (tuple xy #f  0 0 0))))
+               (o-list-set (put #empty (hash xy)  (vector xy #f  0 0 0))))
       (if (eq? o-list-set #empty) ; некуда идти :(
-         #false ;(tuple 0 0 #empty #empty)
+         #false ;(vector 0 0 #empty #empty)
 
       ; найдем клетку с минимальной стоимостью:
       (let*((f (ff-fold (lambda (s key value)
@@ -191,7 +191,7 @@
                (let*((parent (ref (get c-list-set (hash xy) #f) 2)) ; todo: переделать
                      (parent-of-parent (ref (get c-list-set (hash parent) #f) 2)))
                   (if parent-of-parent (rev parent)
-                     (cons ;(tuple
+                     (cons ;(vector
                         (- (car xy) (car parent))
                         (- (cdr xy) (cdr parent))
                         ;c-list-set
@@ -222,11 +222,11 @@
                                        ; если эта клетка уже в списке
                                        (if got
                                           (if (< G (ref got 3)) ; но наш путь короче
-                                             (put o (hash v)  (tuple v xy  G H (+ G H)))
+                                             (put o (hash v)  (vector v xy  G H (+ G H)))
                                              ;else ничего не делаем
                                              o)
                                           ; else
-                                          (put o (hash v)  (tuple v xy  G H (+ G H)))))
+                                          (put o (hash v)  (vector v xy  G H (+ G H)))))
                                     o))
                                  o-list-set (list
                                                 (cons x (- y 1))
@@ -263,11 +263,11 @@
          (print "gid: " gid)
          (if (= hero-id (cdr gid))
             (return (car gid))))
-         (reverse (ff->list (interact 'level (tuple 'get 'gids))))))))
+         (reverse (ff->list (interact 'level (vector 'get 'gids))))))))
 (print "hero-name: " hero-name)
 
 ;; (for-each (lambda (layer)
-;; (ff->list (interact 'level (tuple 'get 'layers))))
+;; (ff->list (interact 'level (vector 'get 'layers))))
 ;; ;(for-each (lambda (layer)))
 
 ; зададим анимации герою, в нашем случае он будет выглядеть как скелет
@@ -292,7 +292,7 @@
 (print "width: " width ", height: " height)
 
 
-(define window (tuple (- cx width) (- cy height)
+(define window (vector (- cx width) (- cy height)
                       (+ cx width) (+ cy height)))
 
 (define (resize scale) ; изменение масштаба
@@ -323,8 +323,8 @@
          (w screen-width) (h screen-height))
    (let ((X (floor (+ x1 (/ (* (car xy) x2-x1) w))))
          (Y (floor (+ y1 (/ (* (cdr xy) y2-y1) h)))))
-   (let ((w (interact 'level (tuple 'get 'tilewidth)))
-         (h (interact 'level (tuple 'get 'tileheight))))
+   (let ((w (interact 'level (vector 'get 'tilewidth)))
+         (h (interact 'level (vector 'get 'tileheight))))
    (let ((x (+ (/ X w) (/ Y h)))
          (y (- (/ Y h) (/ X w))))
       (cons (floor x) (floor y))))))))
@@ -419,8 +419,8 @@
             ;; ; события нипов пускай остаются асинхронными,
             ;; ; просто перед рисованием убедимся что они все закончили свою работу
             ;; (for-each (lambda (id)
-            ;;       (mail id (tuple 'process-event-transition-tick)))
-            ;;    (interact 'creatures (tuple 'get 'skeletons)))
+            ;;       (mail id (vector 'process-event-transition-tick)))
+            ;;    (interact 'creatures (vector 'get 'skeletons)))
          )))
 
    ; теперь можем и порисовать: очистим окно и подготовим оконную математику
@@ -433,7 +433,7 @@
 
    ; теперь попросим уровень отрисовать себя
 ;   (define gems (list
-;      (tuple '(0 . 1) (cons gem-id '(0 . 0)))))
+;      (vector '(0 . 1) (cons gem-id '(0 . 0)))))
 
    (level:draw #false gems)
 
@@ -450,7 +450,7 @@
                      ((step-available? from mousetile) 0)
                      ((move-available? from mousetile) 2)
                      (else 1))))
-            (tile (getf (interact 'level (tuple 'get 'tileset)) id))
+            (tile (getf (interact 'level (vector 'get 'tileset)) id))
             (w (/ (- (ref window 3) (ref window 1)) 48)) ;  размер курсора
             (st (ref tile 5))
             ; window mouse to opengl mouse:
@@ -490,9 +490,9 @@
    (print "key: " key)
    (case key
       (vkZ
-         (mail 'game (tuple 'undo)))
+         (mail 'game (vector 'undo)))
       (vkQ
-         ;(mail 'music (tuple 'shutdown))
+         ;(mail 'music (vector 'shutdown))
          (halt 1))))) ; q - quit
 
 (gl:set-mouse-handler (lambda (button x y)
@@ -502,7 +502,7 @@
          (1 ; left
             (let ((tile (xy:screen->tile (cons x y))))
                (set-world-busy #true)
-               (mail 'game (tuple 'move tile))))
+               (mail 'game (vector 'move tile))))
          (5 ; scroll down
             (resize 1.1))
          (4 ; scroll up
@@ -515,19 +515,19 @@
    (let this ((itself #empty))
    (let*((envelope (wait-mail))
          (sender msg envelope))
-      (tuple-case msg
-         ((undo)
-            (tuple-case (interact 'stash (tuple 'pop))
+      (case msg
+         (['undo]
+            (case (interact 'stash (vector 'pop))
                ; простое перемещение по маршруту
-               ((move step from to)
+               (['move step from to]
                   (creature:set-location 'hero from))
-               ((push step id from gem)
+               (['push step id from gem]
                   (set-car! (car gem) (car from))
                   (set-cdr! (car gem) (cdr from))
                   (set-cdr! gem id))
                (else #false))
             (this itself))
-         ((move to)
+         (['move to]
             (define from (creature:get-location 'hero))
             (cond
                ((equal? from to) ; если тыкнули на себя
@@ -557,8 +557,8 @@
                                     #true)
                                  ((equal? (caar gems) to)
                                     ; хех, нашли чашу!
-                                    (mail 'stash (tuple 'push
-                                       (tuple 'push (car steps) (cdar gems) to (car gems))))
+                                    (mail 'stash (vector 'push
+                                       (vector 'push (car steps) (cdar gems) to (car gems))))
                                     ; давайте ее подвинем (мы уже раньше проверили, что ее можно двигать)
                                     (let ((x (+ (caaar gems) (car rel)))
                                           (y (+ (cdaar gems) (cdr rel)))
@@ -577,13 +577,13 @@
                            (config 'move-with-push))
                      ; и пошлем его в дорогу (если некого двигать)
                      (begin
-                        (mail 'stash (tuple 'push (tuple 'move (car steps) from to)))
+                        (mail 'stash (vector 'push (vector 'move (car steps) from to)))
                         (creature:move-with-animation 'hero rel 'run #f)
                         (set-car! steps (+ (car steps) 1))))))
                (else
                   ; иначе идем куда сказали
                   ; но сначала запишем этот ход в список
-                  (mail 'stash (tuple 'push (tuple 'move (car steps) from to)))
+                  (mail 'stash (vector 'push (vector 'move (car steps) from to)))
                   (let loop ((from from))
                      (let ((rel (A* from to)))
                         (if rel ; если еще не пришли
