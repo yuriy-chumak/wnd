@@ -5,10 +5,12 @@
 (define-library (lib gl config)
 (export config) (import (otus lisp))
 (begin
-   (define config (pairs->ff `(
+   (define config {
       ; напомню, что мы используем фиксированный шрифт размера 9*16
-      (width  . ,(* 1  9 80))      ; 80 знакомест в ширину
-      (height . ,(* 1 16 25))))))) ; 25 знакомест в высоту
+      'width  (* 1  9 80)      ; 80 знакомест в ширину
+      'height (* 1 16 25)      ; 25 знакомест в высоту
+      'scale  40               ; шкала увеличения
+   })))
 (import (lib gl config))
 
 ; -=( main )=------------------------------------
@@ -35,38 +37,38 @@
 (gl:SwapBuffers (interact 'opengl ['get 'context])) ; todo: make a function
 (glDeleteTextures 1 (list id)) ; и спокойно удалим сплеш текстуру
 
-; -------------------------------------------------------
-; теперь запустим текстовую консольку
-(import (lib gl console))
+;; ; -------------------------------------------------------
+;; ; теперь запустим текстовую консольку
+;; (import (lib gl console))
 
-; временное окно дебага (покажем fps):
-(define fps (create-window 70 24 10 1))
-(define started (time-ms)) (define time '(0))
-(define frames '(0 . 0))
+;; ; временное окно дебага (покажем fps):
+;; (define fps (create-window 70 24 10 1))
+;; (define started (time-ms)) (define time '(0))
+;; (define frames '(0 . 0))
 
-(set-window-writer fps (lambda (print)
-   (set-car! frames (+ (car frames) 1))
-   (let ((now (time-ms)))
-      (if (> now (+ started (car time) 1000))
-         (begin
-            (set-cdr! frames (car frames))
-            (set-car! frames 0)
-            (set-car! time (- now started)))))
-   (print GRAY (cdr frames) " fps")
-))
+;; (set-window-writer fps (lambda (print)
+;;    (set-car! frames (+ (car frames) 1))
+;;    (let ((now (time-ms)))
+;;       (if (> now (+ started (car time) 1000))
+;;          (begin
+;;             (set-cdr! frames (car frames))
+;;             (set-car! frames 0)
+;;             (set-car! time (- now started)))))
+;;    (print GRAY (cdr frames) " fps")
+;; ))
 
 ; ----------------
 ; музычка...
 ;,load "music.lisp" ; временно отключена
 
-;; ; остальные игровые библиотеки
+;; ; остальные библиотеки (в том числе игровые)
+(import (lib keyboard))
 ;; (import (lib math))
 ;; (import (otus random!))
 ;; (import (lang sexp))
 ;; (import (scheme misc))
 ;; (import (file xml))
 ;; (import (scheme dynamic-bindings))
-(import (lib rlutil))
 
 ;; ; -=( level )=-----------------
 ;; ;     заведует игровой картой
@@ -80,7 +82,6 @@
 ;; ; =============================
 ;; ; 1. Загрузим игровой уровень
 (level:load "sample.tmx")
-
 ;; ; временная функция работы с level-collision
 ;; (define collision-data (level:get-layer 'collision))
 
@@ -223,7 +224,8 @@
 
 ;; ;              x-left         y-left    x-right          y-right
 ;; ;(define window (vector (+ -32 -800) -32 (+ 3645 32 -800) (+ 2048 32)))
-(define window (vector 0 0 85.4/4 48.0/4))
+(define window [0 0 854 480])
+
 ;; (define (resize scale) ; изменение масштаба
 ;;    (let*((x (floor (/ (+ (ref window 3) (ref window 1)) 2)))
 ;;          (w (floor (* (- (ref window 3) (ref window 1)) (/ scale 2))))
@@ -234,12 +236,12 @@
 ;;       (set-ref! window 3 (+ x w))
 ;;       (set-ref! window 4 (+ y h))))
 (define (move dx dy) ; сдвинуть окно
-   (let*((x (floor (* (- (ref window 3) (ref window 1)) 0.01)))
-         (y (floor (* (- (ref window 4) (ref window 2)) 0.01))))
-      (set-ref! window 1 (+ (ref window 1) (* dx x)))
-      (set-ref! window 2 (- (ref window 2) (* dy y)))
-      (set-ref! window 3 (+ (ref window 3) (* dx x)))
-      (set-ref! window 4 (- (ref window 4) (* dy y)))))
+   (let*((w (- (ref window 3) (ref window 1))) ;window width
+         (h (- (ref window 4) (ref window 2))));window height
+      (set-ref! window 1 (+ (ref window 1) (floor (* dx w))))
+      (set-ref! window 2 (- (ref window 2) (floor (* dy h))))
+      (set-ref! window 3 (+ (ref window 3) (floor (* dx w))))
+      (set-ref! window 4 (- (ref window 4) (floor (* dy h))))))
 
 ;; ; функция перевода экранных координат в номер тайла, на который они попадают
 ;; (define (xy:screen->tile xy)
@@ -260,7 +262,7 @@
 ; init
 (glShadeModel GL_SMOOTH)
 (glBlendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA)
-;; (gl:hide-cursor)
+(gl:hide-cursor)
 
 ;; ;; ; служебные переменные
 ;; ;; (define timestamp (box 0))
@@ -318,6 +320,10 @@
    (glClear GL_COLOR_BUFFER_BIT)
    (glLoadIdentity)
    (glOrtho (ref window 1) (ref window 3) (ref window 4) (ref window 2) -1 1)
+
+   ; зададим пропорциональное увеличение
+   (glScalef (config 'scale 40) (config 'scale 40) 1)
+
    (glEnable GL_TEXTURE_2D)
    (glEnable GL_BLEND)
 
@@ -335,48 +341,40 @@
    (level:draw #null) ;creatures
 
    ; окошки, консолька, etc.
-   (render-windows)
+   ;; (render-windows)
 
-;;    ; let's draw mouse pointer
-;;    (if mouse
-;;       (let*(;(ms (mod (floor (/ (time-ms) 100)) 40))
-;;             (tile (getf (level:get 'tileset)
-;;                         (+ (level:get-gid 'pointer)
-;;                            (if (world-busy?) 1 0))))
-;; ;;                            ;; (cond
-;; ;;                            ;;    ((world-busy?) 1)
-;; ;;                            ;;    ((let ((xy (xy:screen->tile mouse)))
-;; ;;                            ;;       (and (< (car xy) (level:get 'width))
-;; ;;                            ;;            (< (cdr xy) (level:get 'height))
-;; ;;                            ;;            (>= (car xy) 0)
-;; ;;                            ;;            (>= (cdr xy) 0)
-;; ;;                            ;;            (A* collision-data xy (creature:get-location 'hero))))
-;; ;;                            ;;       0)
-;; ;;                            ;;    (else 3)))))
-;; ;;                         ;; (unless (unbox calculating-world)
-;; ;;                         ;;    (+ 1212 ms)
-;; ;;                         ;;    (+ 1292 ms))))
-;;             (w (/ (- (ref window 3) (ref window 1)) 48)) ;  размер курсора
-;;             (st (ref tile 5))
-;;             ; window mouse to opengl mouse:
-;;             (x (+ (ref window 1) (* (car mouse) (- (ref window 3) (ref window 1)) (/ 1 (ref gl:window-dimensions 3)))))
-;;             (y (+ (ref window 2) (* (cdr mouse) (- (ref window 4) (ref window 2)) (/ 1 (ref gl:window-dimensions 4))))))
-;;          (glEnable GL_TEXTURE_2D)
-;;          (glEnable GL_BLEND)
-;;          (glBindTexture GL_TEXTURE_2D (ref tile 1))
-;;          (glBegin GL_QUADS)
-;;             (glTexCoord2f (ref st 1) (ref st 2))
-;;             (glVertex2f x y)
+   ; let's draw mouse pointer
+   (glScalef (/ 1 (config 'scale 40)) (/ 1 (config 'scale 40)) 1)
+   (if mouse
+      (let*(;(ms (mod (floor (/ (time-ms) 100)) 40))
+            (viewport '(0 0 0 0))
+            (_ (glGetIntegerv GL_VIEWPORT viewport))
+            (tile (getf (level:get 'tileset)
+                        (+ (level:get-gid 'pointer)
+                           (if (world-busy?) 1 0))))
+            (w (config 'scale 40)) ;(- (ref window 3) (ref window 1))) ;  размер курсора
+            (st (ref tile 5))
+            (dx (/ (- (car mouse) (lref viewport 0)) (lref viewport 2)))
+            (dy (/ (- (cdr mouse) (lref viewport 1)) (lref viewport 3)))
+            ; window mouse to opengl mouse:
+            (x (+ (ref window 1) (* dx (- (ref window 3) (ref window 1)))))
+            (y (+ (ref window 2) (* dy (- (ref window 4) (ref window 2))))))
+         (glEnable GL_TEXTURE_2D)
+         (glEnable GL_BLEND)
+         (glBindTexture GL_TEXTURE_2D (ref tile 1))
+         (glBegin GL_QUADS)
+            (glTexCoord2f (ref st 1) (ref st 2))
+            (glVertex2f x y)
 
-;;             (glTexCoord2f (ref st 3) (ref st 2))
-;;             (glVertex2f (+ x w) y)
+            (glTexCoord2f (ref st 3) (ref st 2))
+            (glVertex2f (+ x w) y)
 
-;;             (glTexCoord2f (ref st 3) (ref st 4))
-;;             (glVertex2f (+ x w) (+ y w))
+            (glTexCoord2f (ref st 3) (ref st 4))
+            (glVertex2f (+ x w) (+ y w))
 
-;;             (glTexCoord2f (ref st 1) (ref st 4))
-;;             (glVertex2f x (+ y w))
-;;          (glEnd)))
+            (glTexCoord2f (ref st 1) (ref st 4))
+            (glVertex2f x (+ y w))
+         (glEnd)))
 
 
 ;; ;;    ; coordinates
@@ -409,12 +407,16 @@
 ;;    ; обработчик состояния клавиатуры
 ;;    ;  внимание, это "состояние", а не "события"!
 ;;    ;  посему можно обрабатывать сразу несколько нажатий клавиатуры одновременно
+   (if (key-pressed? KEY_ESC) (halt 1))
+
+   ; дебаг-интерфейс, позволяющий двигать окно просмотра по всей карте:
+   (if (key-pressed? KEY_RIGHT) (move +0.005 0)) ; right
+   (if (key-pressed? KEY_LEFT)  (move -0.005 0)) ; left
+   (if (key-pressed? KEY_UP)    (move 0 +0.01)) ; up
+   (if (key-pressed? KEY_DOWN)  (move 0 -0.01)) ; down
+
 ;;    (if (key-pressed #x3d) (resize 0.9)) ;=
 ;;    (if (key-pressed #x2d) (resize 1.1)) ;-
-   (if (key-pressed #xff53) (move +0.1 0)); right
-   (if (key-pressed #xff51) (move -0.1 0)); left
-   (if (key-pressed #xff52) (move 0 +0.1)); up
-   (if (key-pressed #xff54) (move 0 -0.1)); down
 ))
 
 

@@ -6,6 +6,9 @@
  <tileset firstgid="257" name="collision" tilewidth="32" tileheight="32" tilecount="8" columns="8">
   <image source="media/collision.png" width="256" height="32"/>
  </tileset>
+ <tileset firstgid="265" name="pointer" tilewidth="28" tileheight="28" tilecount="4" columns="2">
+  <image source="media/pointers.png" width="56" height="56"/>
+ </tileset>
  <layer name="background" width="64" height="64">
   <data encoding="csv">
 34,36,36,36,36,36,33,0,34,36,36,36,36,36,36,36,33,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
