@@ -9,7 +9,7 @@
       ; напомню, что мы используем фиксированный шрифт размера 9*16
       'width  (* 1  9 80)      ; 80 знакомест в ширину
       'height (* 1 16 25)      ; 25 знакомест в высоту
-      'scale  40               ; шкала увеличения
+      'scale  32               ; шкала увеличения
    })))
 (import (lib gl config))
 
@@ -23,7 +23,7 @@
 ; -=( сразу нарисуем сплеш )=---------------------------
 (glOrtho 0 1 1 0 0 1)
 (glEnable GL_TEXTURE_2D)
-(define id ; OpenGL texture splash ID
+(define id
    (SOIL_load_OGL_texture (c-string "splash.png") SOIL_LOAD_RGBA SOIL_CREATE_NEW_ID 0))
 (glBindTexture GL_TEXTURE_2D id)
 (glBegin GL_QUADS)
@@ -36,6 +36,26 @@
 (glDisable GL_TEXTURE_2D)
 (gl:SwapBuffers (interact 'opengl ['get 'context])) ; todo: make a function
 (glDeleteTextures 1 (list id)) ; и спокойно удалим сплеш текстуру
+
+; ----------------------------------------------------------
+; включим для windows VSYNC,
+; для linux он включен по умолчанию 
+;
+(define-library (---)
+(export enable-vsync)
+(import (scheme core))
+(cond-expand
+   (Windows
+      (import (OpenGL WGL EXT swap_control))
+      (begin
+         (define (enable-vsync)
+            (if WGL_EXT_swap_control
+               (wglSwapIntervalEXT 1))))) ; enable vsync
+   (else
+      (begin
+         (define (enable-vsync) #false)))))
+(import (---))
+(enable-vsync)
 
 ;; ; -------------------------------------------------------
 ;; ; теперь запустим текстовую консольку
@@ -73,7 +93,7 @@
 ;; ; -=( level )=-----------------
 ;; ;     заведует игровой картой
 ,load "nani/level.lisp"
-;; ,load "nani/creature.lisp"
+,load "nani/creature.lisp"
 ;; ,load "nani/ai.lisp"
 
 ;; ;; ;;; -=( creatures )=-----------------
@@ -81,7 +101,7 @@
 
 ;; ; =============================
 ;; ; 1. Загрузим игровой уровень
-(level:load "sample.tmx")
+(level:load "поверх-1.tmx")
 ;; ; временная функция работы с level-collision
 ;; (define collision-data (level:get-layer 'collision))
 
@@ -93,16 +113,96 @@
 ;; (define (at x y)
 ;;    (if (and (< -1 x W) (< -1 y H))
 ;;       (lref (lref collision-data y) x)))
+(define CELL-WIDTH (interact 'level ['get 'tilewidth]))
+(define CELL-HEIGHT (interact 'level ['get 'tileheight]))
+
+
+; временная функция работы с level-collision
+(define collision-data (level:get-layer 'collision))
+
+(define H (length collision-data))       ; высота уровня
+(define W (length (car collision-data))) ; ширина уровня
+
+; временная функция: возвращает collision data
+;  по координатам x,y на карте
+(define (at x y)
+   (let ((x (round x))
+         (y (round y)))
+      (if (and (< -1 x W) (< -1 y H))
+         (lref (lref collision-data y) x))))
 
 ;; ;; ; =================================================================
 ;; ;; ; -=( hero )=---------
+;; (define template (call/cc (lambda (return)
+;;    (ff-fold (lambda (result key value)
+;;                (print value " / " (value 'type ""))
+;;                (if (string-eq? (value 'type "") "hero") (return value)))
+;;       #false
+;;       (interact 'level ['get 'npcs])))))
+;; (print "hero template: " template)
+
+(define tilenames (interact 'level ['get 'tilenames]))
+(print tilenames)
+
+(define npcs
+   (ff-fold (lambda (& key value)
+               ;(print "key: " key)
+               (define npc (make-creature key #empty))
+;;                ;;(print "npc: " npc)
+               ;(print "value: " value)
+               ((npc 'set-location) (cons
+                  (/ (string->number (value 'x) 10) CELL-WIDTH)
+                  (/ (string->number (value 'y) 10) CELL-HEIGHT)))
+               ; тут надо найти какому тайлсету принадлежит этот моб
+               (define gid (string->number (value 'gid) 10))
+               ;(print "gid: " gid)
+               (call/cc (lambda (done)
+                  (let loop ((old tilenames) (tiles tilenames))
+                     ;(print "old: " old ", tiles: " tiles)
+                     (if (or
+                           (null? tiles)
+                           (< gid (ref (car tiles) 1)))
+                        (begin
+                           (define r (string->regex "s/^.+\\/(.+)\\..+/\\1/"))
+                           (define name (r (ref old 3)))
+                           (print "name: " name)
+                           
+                           ((npc 'set-animation-profile)
+                              (string->symbol name)
+                              (fold string-append "" (list "animations/" name ".ini")))
+                           
+                           (define orientation (div (- gid (ref old 1)) (ref old 2)))
+                           ((npc 'set-orientation) orientation)
+
+                           (done #t))
+                        (loop (car tiles) (cdr tiles))))))
+               ((npc 'set-current-animation) 'default)
+               (put & key npc))
+      #empty
+      (interact 'level ['get 'npcs])))
+;; (print "npcs: " npcs)
+
+
+;; (define hero-location (cons
+;;    (/ (ref (getf (interact 'level ['get 'npcs]) hero) 4) 32)
+;;    (/ (ref (getf (interact 'level ['get 'npcs]) hero) 5) 32)))
+
+;; (print "hero-location: " hero-location)
+
 ;; (define hero (make-creature 'hero #empty))
 ;; ; зададим позицию героя в мире
-;; ((hero 'set-location) (cons 30 33))        ; новый способ перемещения героя - выбрать какой лучше
+;; ; TEMP:
 
-;; ; зададим анимации герою, в нашем случае он будет выглядеть как человек
-;; ((hero 'set-animation-profile) 'skeleton "animations/skeleton.ini")
-;; ((hero 'set-current-animation) 'stance) ; пусть он просто стоит
+;; ((hero 'set-location) (cons
+;;    (/ (string->number (template 'x) 10) CELL-WIDTH)
+;;    (/ (string->number (template 'y) 10) CELL-HEIGHT)))
+
+;; ; зададим анимации герою
+;; ((hero 'set-animation-profile) 'ninja_f "animations/ninja_f.ini")
+;; ((hero 'set-current-animation) 'default)
+
+;; ((hero 'set-orientation) 0)
+
 
 ;; ((hero 'set) 'state ; задать машину состояний (сразу с текущим)
 ;;    (letrec ((alive (lambda (this action) ; стоим и ничего не делаем
@@ -271,7 +371,7 @@
 ;;    (less? 0 (unbox calculating-world)))
 
 ; draw
-(gl:set-renderer (lambda (mouse)
+(define (playing-level-screen mouse)
 ;;    ; тут мы поворачиваем нашего героя в сторону мышки
 ;;    (unless (world-busy?) (if (> ((hero 'get) 'health) 0)
 ;;       (let*((mousetile (xy:screen->tile mouse))
@@ -327,18 +427,19 @@
    (glEnable GL_TEXTURE_2D)
    (glEnable GL_BLEND)
 
-;;    ; теперь попросим уровень отрисовать себя
-;;    (define creatures (append
-;;       (map (lambda (npc)
-;;             [ ((npc 'get-location))
-;;               ((npc 'get-animation-frame))])
-;;          (interact 'npcs #false))
-;;       (list
-;;          [ (interact 'hero (list 'get-location))
-;;            (interact 'hero (list 'get-animation-frame))])
-;;    ))
+   ; теперь попросим уровень отрисовать себя
+   (define creatures
+      (map (lambda (creature)
+            (define npc (cdr creature))
+            [ ((npc 'get-location))
+              ((npc 'get-animation-frame))])
+         ; отсортируем npc снизу вверх
+         (sort (lambda (a b)
+                  (< (cdr (((cdr a) 'get-location)))
+                     (cdr (((cdr b) 'get-location)))))
+               (ff->list npcs))))
 
-   (level:draw #null) ;creatures
+   (level:draw creatures)
 
    ; окошки, консолька, etc.
    ;; (render-windows)
@@ -409,16 +510,44 @@
 ;;    ;  посему можно обрабатывать сразу несколько нажатий клавиатуры одновременно
    (if (key-pressed? KEY_ESC) (halt 1))
 
+   (define (move dx dy)
+      (define hero (npcs 1))
+      (define loc ((hero 'get-location)))
+
+      (define newloc (cons
+         (+ (car loc) dx)
+         (+ (cdr loc) dy)))
+      ; проверить можно ли ходить
+      (unless (or
+            (eq? (at    (car newloc)      (+ (cdr newloc) 0.05)) 0)
+            (eq? (at (+ (car newloc) 1)   (+ (cdr newloc) 0.05)) 0)
+            (eq? (at (+ (car newloc) 1)   (- (cdr newloc) 0.2)) 0)
+            (eq? (at    (car newloc)      (- (cdr newloc) 0.2)) 0))
+         ((hero 'set-location)
+            newloc))
+            
+      ((hero 'set-orientation)
+         (cond
+            ((> dx 0) 1)
+            ((< dx 0) 3)
+            ((> dy 0) 2)
+            ((< dy 0) 0)
+            (else
+               (hero 'get-orientation))))
+   )
+
+
    ; дебаг-интерфейс, позволяющий двигать окно просмотра по всей карте:
-   (if (key-pressed? KEY_RIGHT) (move +0.005 0)) ; right
-   (if (key-pressed? KEY_LEFT)  (move -0.005 0)) ; left
-   (if (key-pressed? KEY_UP)    (move 0 +0.01)) ; up
-   (if (key-pressed? KEY_DOWN)  (move 0 -0.01)) ; down
+   (if (key-pressed? KEY_RIGHT) (move +0.05 0)) ; right
+   (if (key-pressed? KEY_LEFT)  (move -0.05 0)) ; left
+   (if (key-pressed? KEY_UP)    (move 0 -0.03)) ; up
+   (if (key-pressed? KEY_DOWN)  (move 0 +0.03)) ; down
+
+   (if (key-pressed? KEY_2)     (interact 'game ['change-level 'поверх-2]))
 
 ;;    (if (key-pressed #x3d) (resize 0.9)) ;=
 ;;    (if (key-pressed #x2d) (resize 1.1)) ;-
-))
-
+)
 
 ;; ;; ; --------------------------------------------
 ;; ;; ;; (define (unX x y tw th)
@@ -436,12 +565,12 @@
 ;; ;; ; keyboard
 ;; ;; ; обработчик событий клавиатуры
 ;; ;; ;  внимание, это "события", а не "состояние"!!!
-;; ;; (gl:set-keyboard-handler (lambda (key)
-;; ;;    (print "key: " key)
-;; ;;    (case key
-;; ;;       (#x18
-;; ;;          ;(mail 'music ['shutdown])
-;; ;;          (halt 1))))) ; q - quit
+;; (gl:set-keyboard-handler (lambda (key)
+;;    (print "key: " key)))
+;;    ;; (case key
+;;    ;;    (#x18
+;;    ;;       ;(mail 'music ['shutdown])
+;;    ;;       (halt 1))))) ; q - quit
 
 ;; (gl:set-mouse-handler (lambda (button x y)
 ;;    (print "mouse: " button " (" x ", " y ")")
@@ -459,11 +588,28 @@
 ;;             #true))
 ;;    )))
 
-;; (fork-server 'game (lambda ()
-;;    (let this ((itself #empty))
-;;    (let*((envelope (wait-mail))
-;;          (sender msg envelope))
-;;       (case msg
+(define (changing-level-screen mouse)
+   ; nothing
+   (if (key-pressed? KEY_ESC) (halt 1))
+   #false)
+
+(define renderer (box playing-level-screen))
+(gl:set-renderer (lambda (mouse)
+   ((unbox renderer) mouse)))
+
+; -- game ----------------------------------
+(fork-server 'game (lambda ()
+   (let this ((itself #empty))
+   (let*((envelope (wait-mail))
+         (sender msg envelope))
+      (case msg
+
+         (['change-level level-name]
+            (print "changing level to " level-name)
+            (set-car! renderer changing-level-screen)
+            (mail sender 'ok)
+            (this itself))
+
 ;; ;;          (['turn]
 ;; ;;             (let ((creatures
 ;; ;;                      (sort (lambda (a b)
@@ -526,6 +672,6 @@
 
 ;;             (set-car! calculating-world (- (unbox calculating-world) 1))
 ;;             (this itself))
-;;          (else
-;;             (print "logic: unhandled event: " msg)
-;;             (this itself)))))))
+         (else
+            (print "logic: unhandled event: " msg)
+            (this itself)))))))

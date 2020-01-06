@@ -100,8 +100,22 @@
                            (string->number (xml-get-attribute tileset 'tilewidth "64") 10))))
                   tilesets)))
 
-               (print "tilesets: " tilesets)
-               (print)
+               ; tile names:
+               (define tilenames
+                  (map
+                     (lambda (tileset)
+                        (let ((image (xml-get-subtag tileset 'image))
+                              (tileoffset (xml-get-subtag tileset 'tileoffset)))
+                           (define name (xml-get-attribute image 'source "checker.png"))
+                           (define first-gid (string->number (xml-get-attribute tileset 'firstgid "0") 10))
+
+                           (define image-width (string->number (xml-get-attribute image 'width "64") 10))
+                           (define tile-width (string->number (xml-get-attribute tileset 'tilewidth "64") 10))
+                           (define columns (/ image-width tile-width))
+
+                           [first-gid columns name]))
+                     tilesets))
+
 
                ; make ff (id > tileset element)
                (define tileset
@@ -112,8 +126,9 @@
                      (lambda (tileset)
                         (let ((image (xml-get-subtag tileset 'image))
                               (tileoffset (xml-get-subtag tileset 'tileoffset)))
+                           (define name (xml-get-attribute image 'source "checker.png"))
                            (define id ; OpenGL texture atlas id
-                              (SOIL_load_OGL_texture (c-string (xml-get-attribute image 'source "checker.png")) SOIL_LOAD_RGBA SOIL_CREATE_NEW_ID 0))
+                              (SOIL_load_OGL_texture (c-string name) SOIL_LOAD_RGBA SOIL_CREATE_NEW_ID 0))
                            (define image-width (string->number (xml-get-attribute image 'width "64") 10))
                            (define image-height (string->number (xml-get-attribute image 'height "32") 10))
 
@@ -163,18 +178,19 @@
                                  #empty
                                  (xml-get-subtags level 'layer)))
 
-               ;; (define npcs (fold (lambda (ff object)
-               ;;                      (define id (string->number (xml-get-attribute object 'id #f) 10))
-               ;;                      (define name (xml-get-attribute object 'name #f))
-               ;;                      (define type (xml-get-attribute object 'type #f))
-               ;;                      (define x (div (floor (string->number (xml-get-attribute object 'x #f) 10)) 32))
-               ;;                      (define y (div (floor (string->number (xml-get-attribute object 'y #f) 10)) 32))
-               ;;                      ;; (print "name: " name ", type: " type ", x/y: " x "/" y)
-
-               ;;                      (put ff id [name type x y]))
-               ;;                   #empty
-               ;;                   (xml-get-subtags (xml-get-subtag level 'objectgroup) 'object)))
-
+               (define npcs
+                  (fold (lambda (ff objectgroup)
+                           (fold (lambda (ff object)
+                                    (define id (string->number (xml-get-attribute object 'id "0") 10))
+                                    (put ff id (ref object 2)))
+                              ff
+                              (xml-get-subtags objectgroup 'object)))
+                     {}
+                     (filter
+                        (lambda (tag)
+                           (string-eq? (xml-get-attribute tag 'name "") "objects"))
+                        (xml-get-subtags level 'objectgroup))))
+               
                ; ok
                (mail sender 'ok)
                ; парсинг и предвычисления закончены, запишем нужные параметры
@@ -185,8 +201,10 @@
                   (gids . ,gids)
                   (columns . ,columns)
                   (tileset . ,tileset)
-                  ;(npcs . ,npcs)
-                  (layers . ,layers)))))
+                  (npcs . ,npcs)
+                  (tilenames . ,tilenames)
+                  (layers . ,layers)))
+               ))
 
             ; draw the level on the screen
             (['draw creatures]; interact
@@ -237,48 +255,70 @@
                   (glEnable GL_TEXTURE_2D)
                   (define (draw-layer data entities)
                      (map (lambda (line j)
-                           (map (lambda (tid i)
-                                 ; если есть что рисовать - рисуем
-                                 (unless (eq? tid 0)
-                                    (draw-tile tid i j))
-                                 ; и если в клетке есть кого рисовать, то нарисуем
-                                 (if entities
-                                    (for-each (lambda (entity)
-                                                (if (and
-                                                      (eq? (car (ref entity 1)) i)
-                                                      (eq? (cdr (ref entity 1)) j))
-                                                   (let ((tile (ref entity 2)))
-                                                      (if (pair? tile)
-                                                         (draw-tile
-                                                            (car tile)
-                                                            (unless (cdr tile) i (+ i (cadr tile)))
-                                                            (unless (cdr tile) j (+ j (cddr tile))))
-                                                         (draw-tile
-                                                            tile i j)))))
-                                       entities)))
-                              line
-                              (iota (length line))))
+                              ; отрисуем движимое
+                              (for-each (lambda (entity)
+                                          (let ((x (car (ref entity 1)))
+                                                (y (cdr (ref entity 1))))
+                                          (if (<= j y (+ j 1))
+                                             (let ((tile (ref entity 2)))
+                                                (if (pair? tile)
+                                                   (draw-tile
+                                                      (car tile)
+                                                      x (- y 1)))))))
+                                 entities)
+                              ; и недвижимое имущество
+                              (map (lambda (tid i)
+                                    ; если есть что рисовать - рисуем
+                                    (unless (eq? tid 0)
+                                       (draw-tile tid i j)))
+                                 line
+                                 (iota (length line))))
                         data
                         (iota (length data))))
 
-                  ; 1. нарисуем фон (трава, вода, но не стены или деревья)
-                  (define background-data ((itself 'layers) 'background))
-                  (draw-layer background-data #false)
+                  (define (draw-layers data1 data2 entities)
+                     (map (lambda (line1 line2 j)
+                              ; отрисуем движимое
+                              (for-each (lambda (entity)
+                                          (let ((x (car (ref entity 1)))
+                                                (y (cdr (ref entity 1))))
+                                          (if (<= j y (+ j 1))
+                                             (let ((tile (ref entity 2)))
+                                                (if (pair? tile)
+                                                   (draw-tile
+                                                      (car tile)
+                                                      x (- y 1)))))))
+                                 entities)
+                              ; и недвижимое имущество
+                              (map (lambda (tid i)
+                                    ; если есть что рисовать - рисуем
+                                    (unless (eq? tid 0)
+                                       (draw-tile tid i j)))
+                                 line1
+                                 (iota (length line1)))
+                              (map (lambda (tid i)
+                                    ; если есть что рисовать - рисуем
+                                    (unless (eq? tid 0)
+                                       (draw-tile tid i j)))
+                                 line2
+                                 (iota (length line2))))
+                        data1
+                        data2
+                        (iota (length data1))))
+
+                  ; 1. фон (пол, стены, мусор на полу)
+                  (draw-layer ((itself 'layers) 'background)
+                     #null)
 
                   ; 2. теперь очередь движимых и недвижимых объектов
                   ;   так как движимые объекты должны уметь прятаться за недвижимые, то
                   ;   рисовать мы их будем все вместе - слой "object" и наших creatures
                   (define object-data ((itself 'layers) 'interior))
 
-                  ;; (draw-layer object-data (append creatures (list
-                  ;;    [ (interact 'hero ['get-location])
-                  ;;      (interact 'hero ['get-animation-frame])]
-                  ;; )))
-                  (draw-layer object-data #null #|creatures|#)
-
-                  ; и всякие объекты на столаъ, стенах и т.д.
-                  ;(draw-layer ((itself 'layers) 'background) #false)
-
+                  (draw-layers
+                     ((itself 'layers) 'interior)
+                     ((itself 'layers) 'plates)
+                     creatures)
 
                   (mail sender 'ok)
                   (this itself)))
