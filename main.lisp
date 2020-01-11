@@ -271,17 +271,16 @@
          (i (mod (floor (/ (+ (* ss 1000) ms) (/ 1000 4))) 4)))
 
       (unless (eq? i (unbox timestamp))
-         (begin
-            (set-car! timestamp i)
+         (set-car! timestamp i)
 
-            ; надо послать нипам 'tick, а вдруг они захотят с ноги на ногу попереминаться...
+         ; надо послать нипам 'tick, а вдруг они захотят с ноги на ногу попереминаться...
 
-            ;; ; события нипов пускай остаются асинхронными,
-            ;; ; просто перед рисованием убедимся что они все закончили свою работу
-            ;; (for-each (lambda (id)
-            ;;       (mail id (vector 'process-event-transition-tick)))
-            ;;    (interact 'creatures (vector 'get 'skeletons)))
-         )))
+         ;; ; события нипов пускай остаются асинхронными,
+         ;; ; просто перед рисованием убедимся что они все закончили свою работу
+         ;; (for-each (lambda (id)
+         ;;       (mail id (vector 'process-event-transition-tick)))
+         ;;    (interact 'creatures (vector 'get 'skeletons)))
+         ))
 
    ; теперь можем и порисовать: очистим окно и подготовим оконную математику
    (glClearColor 0.0 0.0 0.0 1)
@@ -416,9 +415,8 @@
                (mail 'game (vector 'run tile))))
          ((eq? button 3) ; ПКМ
             (unless (unbox calculating-world) ; если мир сейчас не просчитывается (todo: оформить отдельной функцией)
-               (begin
-                  (set-car! calculating-world 42)
-                  (mail 'game (vector 'turn)))))
+               (set-car! calculating-world 42)
+               (mail 'game (vector 'turn))))
          (else
             ; nothing
             #true))

@@ -233,8 +233,8 @@
                                                       (if (pair? tile)
                                                          (draw-tile
                                                             (car tile)
-                                                            (unless (cdr tile) i (+ i (cadr tile)))
-                                                            (unless (cdr tile) j (+ j (cddr tile))))
+                                                            (if (not (cdr tile)) i (+ i (cadr tile)))
+                                                            (if (not (cdr tile)) j (+ j (cddr tile))))
                                                          (draw-tile
                                                             tile i j)))))
                                        entities)))

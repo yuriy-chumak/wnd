@@ -16,6 +16,7 @@
    (lib math) (otus random!)
    (lang sexp) (scheme misc)
    (file xml) (lib rlutil))
+(import (lib keyboard))
 
 ; ----------------------------------
 ; зададим размеры графического окна
@@ -411,17 +412,16 @@
          (i (mod (floor (/ (+ (* ss 1000) ms) (/ 1000 4))) 4)))
 
       (unless (eq? i (unbox timestamp))
-         (begin
-            (set-car! timestamp i)
+         (set-car! timestamp i)
 
-            ; надо послать нипам 'tick, а вдруг они захотят с ноги на ногу попереминаться...
+         ; надо послать нипам 'tick, а вдруг они захотят с ноги на ногу попереминаться...
 
-            ;; ; события нипов пускай остаются асинхронными,
-            ;; ; просто перед рисованием убедимся что они все закончили свою работу
-            ;; (for-each (lambda (id)
-            ;;       (mail id (vector 'process-event-transition-tick)))
-            ;;    (interact 'creatures (vector 'get 'skeletons)))
-         )))
+         ;; ; события нипов пускай остаются асинхронными,
+         ;; ; просто перед рисованием убедимся что они все закончили свою работу
+         ;; (for-each (lambda (id)
+         ;;       (mail id (vector 'process-event-transition-tick)))
+         ;;    (interact 'creatures (vector 'get 'skeletons)))
+         ))
 
    ; теперь можем и порисовать: очистим окно и подготовим оконную математику
    (glClearColor 0.0 0.0 0.0 1)
@@ -489,9 +489,9 @@
 (gl:set-keyboard-handler (lambda (key)
    (print "key: " key)
    (case key
-      (vkZ
+      (KEY_BACKSPACE
          (mail 'game (vector 'undo)))
-      (vkQ
+      (KEY_ESC
          ;(mail 'music (vector 'shutdown))
          (halt 1))))) ; q - quit
 

@@ -519,10 +519,10 @@
          (+ (cdr loc) dy)))
       ; проверить можно ли ходить
       (unless (or
-            (eq? (at    (car newloc)      (+ (cdr newloc) 0.05)) 0)
-            (eq? (at (+ (car newloc) 1)   (+ (cdr newloc) 0.05)) 0)
-            (eq? (at (+ (car newloc) 1)   (- (cdr newloc) 0.2)) 0)
-            (eq? (at    (car newloc)      (- (cdr newloc) 0.2)) 0))
+            (eq? (at (+ (car newloc) 0.02) (+ (cdr newloc) 0.05)) 0)
+            (eq? (at (+ (car newloc) 0.98) (+ (cdr newloc) 0.05)) 0)
+            (eq? (at (+ (car newloc) 0.98) (- (cdr newloc) 0.20)) 0)
+            (eq? (at (+ (car newloc) 0.02) (- (cdr newloc) 0.20)) 0))
          ((hero 'set-location)
             newloc))
             
