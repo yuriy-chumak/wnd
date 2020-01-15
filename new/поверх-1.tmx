@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.0" tiledversion="1.0.3" orientation="orthogonal" renderorder="right-up" width="20" height="20" tilewidth="32" tileheight="32" nextobjectid="6">
+<map version="1.0" tiledversion="1.0.3" orientation="orthogonal" renderorder="right-up" width="20" height="20" tilewidth="32" tileheight="32" nextobjectid="7">
  <tileset firstgid="1" name="interior" tilewidth="32" tileheight="32" tilecount="256" columns="16">
   <image source="media/interior.png" width="512" height="512"/>
  </tileset>
@@ -14,6 +14,9 @@
  </tileset>
  <tileset firstgid="281" name="warrior_f" tilewidth="32" tileheight="36" tilecount="12" columns="3">
   <image source="characters/warrior_f.png" width="96" height="144"/>
+ </tileset>
+ <tileset firstgid="293" name="mage_f" tilewidth="32" tileheight="36" tilecount="12" columns="3">
+  <image source="../new2/characters/mage_f.png" width="96" height="144"/>
  </tileset>
  <layer name="background" width="20" height="20">
   <data encoding="csv">
@@ -88,9 +91,10 @@
 </data>
  </layer>
  <objectgroup name="objects">
-  <object id="1" name="me" type="hero" gid="269" x="172" y="312" width="32" height="36"/>
+  <object id="1" name="me" type="hero" gid="269" x="167" y="315" width="32" height="36"/>
   <object id="3" gid="290" x="390.333" y="209.667" width="32" height="36"/>
   <object id="5" gid="288" x="301" y="218.667" width="32" height="36"/>
+  <object id="6" gid="300" x="67" y="164" width="32" height="36"/>
  </objectgroup>
  <objectgroup name="items" visible="0"/>
  <layer name="collision" width="20" height="20" visible="0">
