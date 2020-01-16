@@ -16,7 +16,7 @@
 ; -=( main )=------------------------------------
 ; подключаем графические библиотеки, создаем окно
 (import (lib gl2))
-(gl:set-window-title "Хаус")
+(gl:set-window-title "The House of the Rising Sun")
 (import (otus ffi))
 (import (lib soil))
 
@@ -180,8 +180,6 @@
                (put & key npc))
       #empty
       (interact 'level ['get 'npcs])))
-;; (print "npcs: " npcs)
-
 
 ;; (define hero-location (cons
 ;;    (/ (ref (getf (interact 'level ['get 'npcs]) hero) 4) 32)
@@ -502,6 +500,30 @@
 ;; ;;    ;|#
 
 
+      ; ----- порталы -----------------------------
+      (define hero (npcs 1))
+      (let*((location ((hero 'get-location)))
+            (hx (car location))
+            (hy (cdr location))
+            (portals (ff->list (interact 'level ['get 'portals]))))
+         ;; (print "hero location: " location)
+         ;; (print "portals: " portals)
+         
+         (for-each (lambda (id portal)
+               (let ((x (/ (string->number ((car portal) 'x) 10) 32))
+                     (y (/ (string->number ((car portal) 'y) 10) 32))
+                     (width  (/ (string->number ((car portal) 'width) 10) 32))
+                     (height (/ (string->number ((car portal) 'height) 10) 32)))
+                  ; прямоугольники пересекаются?
+                  (print (or
+                     (< (+ hx 1) x)
+                     (< (+ hy 1) y)
+                     (> hx (+ x width))
+                     (< hy (- y height))))
+                  #f))
+            (map car portals)
+            (map cdr portals)))
+
 
 
 ;;    ; -------------
@@ -511,7 +533,6 @@
    (if (key-pressed? KEY_ESC) (halt 1))
 
    (define (move dx dy)
-      (define hero (npcs 1))
       (define loc ((hero 'get-location)))
 
       (define newloc (cons

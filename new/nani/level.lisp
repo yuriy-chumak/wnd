@@ -178,11 +178,14 @@
                                  #empty
                                  (xml-get-subtags level 'layer)))
 
+               ; прочитаем из карты список npc
                (define npcs
                   (fold (lambda (ff objectgroup)
                            (fold (lambda (ff object)
                                     (define id (string->number (xml-get-attribute object 'id "0") 10))
-                                    (put ff id (ref object 2)))
+                                    (if (string-eq? (xml-get-attribute object 'type "") "npc")
+                                       (put ff id (ref object 2))
+                                       ff))
                               ff
                               (xml-get-subtags objectgroup 'object)))
                      {}
@@ -190,7 +193,24 @@
                         (lambda (tag)
                            (string-eq? (xml-get-attribute tag 'name "") "objects"))
                         (xml-get-subtags level 'objectgroup))))
-               
+
+               ; порталы
+               (define portals
+                  (fold (lambda (ff objectgroup)
+                           (fold (lambda (ff object)
+                                    (define id (string->number (xml-get-attribute object 'id "0") 10))
+                                    (if (string-eq? (xml-get-attribute object 'type "") "portal")
+                                       (put ff id (ref object 2))
+                                       ff))
+                              ff
+                              (xml-get-subtags objectgroup 'object)))
+                     {}
+                     (filter
+                        (lambda (tag)
+                           (string-eq? (xml-get-attribute tag 'name "") "objects"))
+                        (xml-get-subtags level 'objectgroup))))
+               (print "portals: " portals)
+
                ; ok
                (mail sender 'ok)
                ; парсинг и предвычисления закончены, запишем нужные параметры
@@ -202,6 +222,7 @@
                   (columns . ,columns)
                   (tileset . ,tileset)
                   (npcs . ,npcs)
+                  (portals . ,portals)
                   (tilenames . ,tilenames)
                   (layers . ,layers)))
                ))
