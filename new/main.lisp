@@ -99,9 +99,10 @@
 ;; ;; ;;; -=( creatures )=-----------------
 ;; ;; ;;;  'creatures - заведует всеми живыми(или оживленными) созданиями
 
-;; ; =============================
-;; ; 1. Загрузим игровой уровень
-(level:load "поверх-1.tmx")
+; ============================================================================
+; 1. Загрузим первый игровой уровень
+(level:load "floor-1.tmx")
+
 ;; ; временная функция работы с level-collision
 ;; (define collision-data (level:get-layer 'collision))
 
@@ -117,20 +118,6 @@
 (define CELL-HEIGHT (interact 'level ['get 'tileheight]))
 
 
-; временная функция работы с level-collision
-(define collision-data (level:get-layer 'collision))
-
-(define H (length collision-data))       ; высота уровня
-(define W (length (car collision-data))) ; ширина уровня
-
-; временная функция: возвращает collision data
-;  по координатам x,y на карте
-(define (at x y)
-   (let ((x (round x))
-         (y (round y)))
-      (if (and (< -1 x W) (< -1 y H))
-         (lref (lref collision-data y) x))))
-
 ;; ;; ; =================================================================
 ;; ;; ; -=( hero )=---------
 ;; (define template (call/cc (lambda (return)
@@ -141,45 +128,40 @@
 ;;       (interact 'level ['get 'npcs])))))
 ;; (print "hero template: " template)
 
-(define tilenames (interact 'level ['get 'tilenames]))
-(print tilenames)
+;; (define tilenames (interact 'level ['get 'tilenames]))
 
-(define npcs
-   (ff-fold (lambda (& key value)
-               ;(print "key: " key)
-               (define npc (make-creature key #empty))
-;;                ;;(print "npc: " npc)
-               ;(print "value: " value)
-               ((npc 'set-location) (cons
-                  (/ (string->number (value 'x) 10) CELL-WIDTH)
-                  (/ (string->number (value 'y) 10) CELL-HEIGHT)))
-               ; тут надо найти какому тайлсету принадлежит этот моб
-               (define gid (string->number (value 'gid) 10))
-               ;(print "gid: " gid)
-               (call/cc (lambda (done)
-                  (let loop ((old tilenames) (tiles tilenames))
-                     ;(print "old: " old ", tiles: " tiles)
-                     (if (or
-                           (null? tiles)
-                           (< gid (ref (car tiles) 1)))
-                        (begin
-                           (define r (string->regex "s/^.+\\/(.+)\\..+/\\1/"))
-                           (define name (r (ref old 3)))
-                           (print "name: " name)
+;; (define npcs
+;;    (ff-fold (lambda (& key value)
+;;                (define npc (make-creature key #empty))
+;;                ((npc 'set-location) (cons
+;;                   (value 'x)
+;;                   (value 'y)))
+;;                ; тут надо найти какому тайлсету принадлежит этот моб
+;;                (define gid (value 'gid))
+;;                (call/cc (lambda (done)
+;;                   (let loop ((old tilenames) (tiles tilenames))
+;;                      (if (or
+;;                            (null? tiles)
+;;                            (< gid (ref (car tiles) 1)))
+;;                         (begin
+;;                            (define r (string->regex "s/^.+\\/(.+)\\..+/\\1/"))
+;;                            (define name (r (ref old 3)))
                            
-                           ((npc 'set-animation-profile)
-                              (string->symbol name)
-                              (fold string-append "" (list "animations/" name ".ini")))
+;;                            ((npc 'set-animation-profile)
+;;                               (string->symbol name)
+;;                               (fold string-append "" (list "animations/" name ".ini")))
                            
-                           (define orientation (div (- gid (ref old 1)) (ref old 2)))
-                           ((npc 'set-orientation) orientation)
+;;                            (define orientation (div (- gid (ref old 1)) (ref old 2)))
+;;                            ((npc 'set-orientation) orientation)
 
-                           (done #t))
-                        (loop (car tiles) (cdr tiles))))))
-               ((npc 'set-current-animation) 'default)
-               (put & key npc))
-      #empty
-      (interact 'level ['get 'npcs])))
+;;                            (done #t))
+;;                         (loop (car tiles) (cdr tiles))))))
+;;                ((npc 'set-current-animation) 'default)
+;;                (put & key npc))
+;;       #empty
+;;       (interact 'level ['get 'npcs])))
+
+; отдельно - герой
 
 ;; (define hero-location (cons
 ;;    (/ (ref (getf (interact 'level ['get 'npcs]) hero) 4) 32)
@@ -426,18 +408,18 @@
    (glEnable GL_BLEND)
 
    ; теперь попросим уровень отрисовать себя
-   (define creatures
-      (map (lambda (creature)
-            (define npc (cdr creature))
-            [ ((npc 'get-location))
-              ((npc 'get-animation-frame))])
-         ; отсортируем npc снизу вверх
-         (sort (lambda (a b)
-                  (< (cdr (((cdr a) 'get-location)))
-                     (cdr (((cdr b) 'get-location)))))
-               (ff->list npcs))))
+   ;; (define creatures
+   ;;    (map (lambda (creature)
+   ;;          (define npc (cdr creature))
+   ;;          [ ((npc 'get-location))
+   ;;            ((npc 'get-animation-frame))])
+   ;;       ; отсортируем npc снизу вверх
+   ;;       (sort (lambda (a b)
+   ;;                (< (cdr (((cdr a) 'get-location)))
+   ;;                   (cdr (((cdr b) 'get-location)))))
+   ;;             (ff->list (interact 'level ['get 'npcs])))))
 
-   (level:draw creatures)
+   (level:draw #null) ;creatures)
 
    ; окошки, консолька, etc.
    ;; (render-windows)
@@ -475,63 +457,51 @@
             (glVertex2f x (+ y w))
          (glEnd)))
 
-
-;; ;;    ; coordinates
-;; ;;    #|
-;; ;;    (glDisable GL_TEXTURE_2D)
-;; ;;    (glEnable GL_LINE_STIPPLE)
-;; ;;    (glLineWidth 2.0)
-;; ;;    (glLineStipple 2 #xAAAA)
-;; ;;    (glBegin GL_LINES)
-;; ;;       (glColor3f 1 0 0)
-;; ;;       (glVertex2f -4096 0)
-;; ;;       (glVertex2f +4096 0)
-;; ;;       ;; (glColor3f 1 0 1)
-;; ;;       ;; (glVertex2f -4096 1024)
-;; ;;       ;; (glVertex2f +4096 1024)
-;; ;;       (glColor3f 0 1 0)
-;; ;;       (glVertex2f 0 -4096)
-;; ;;       (glVertex2f 0 +4096)
-;; ;;       ;; (glColor3f 0 1 1)
-;; ;;       ;; (glVertex2f 1024 -4096)
-;; ;;       ;; (glVertex2f 1024 +4096)
-;; ;;    (glEnd)
-;; ;;    (glDisable GL_LINE_STIPPLE)
-;; ;;    ;|#
-
-
+      ; герой всегда имеет индекс 1
+      (define hero ((interact 'level ['get 'npcs]) 1))
       ; ----- порталы -----------------------------
-      (define hero (npcs 1))
       (let*((location ((hero 'get-location)))
             (hx (car location))
             (hy (cdr location))
             (portals (ff->list (interact 'level ['get 'portals]))))
-         ;; (print "hero location: " location)
-         ;; (print "portals: " portals)
-         
          (for-each (lambda (id portal)
-               (let ((x (/ (string->number ((car portal) 'x) 10) 32))
-                     (y (/ (string->number ((car portal) 'y) 10) 32))
-                     (width  (/ (string->number ((car portal) 'width) 10) 32))
-                     (height (/ (string->number ((car portal) 'height) 10) 32)))
+               (let ((x (portal 'x))
+                     (y (portal 'y))
+                     (width  (portal 'width))
+                     (height (portal 'height)))
                   ; прямоугольники пересекаются?
-                  (print (or
+                  (or
                      (< (+ hx 1) x)
                      (< (+ hy 1) y)
                      (> hx (+ x width))
-                     (< hy (- y height))))
+                     (< hy (- y height)))
                   #f))
             (map car portals)
             (map cdr portals)))
 
 
-
-;;    ; -------------
-;;    ; обработчик состояния клавиатуры
-;;    ;  внимание, это "состояние", а не "события"!
-;;    ;  посему можно обрабатывать сразу несколько нажатий клавиатуры одновременно
+   ; -------------
+   ; обработчик состояния клавиатуры
+   ;  внимание, это "состояние", а не "события"!
+   ;  посему можно обрабатывать сразу несколько нажатий клавиатуры одновременно
    (if (key-pressed? KEY_ESC) (halt 1))
 
+   ; -------------------------------------
+   ;; функции работы с "тут можно ходить"
+   ; временная функция работы с level-collision
+   (define collision-data (level:get-layer 'collision))
+   (define W (level:get 'width)) ; ширина уровня
+   (define H (level:get 'height)) ; высота уровня
+
+   ; временная функция: возвращает collision data
+   ;  по координатам x,y на карте
+   (define (at x y)
+      (let ((x (round x))
+            (y (round y)))
+         (if (and (< -1 x W) (< -1 y H))
+            (lref (lref collision-data y) x))))
+
+   ; двигать героя
    (define (move dx dy)
       (define loc ((hero 'get-location)))
 
@@ -564,7 +534,11 @@
    (if (key-pressed? KEY_UP)    (move 0 -0.03)) ; up
    (if (key-pressed? KEY_DOWN)  (move 0 +0.03)) ; down
 
-   (if (key-pressed? KEY_2)     (interact 'game ['change-level 'поверх-2]))
+   (if (key-pressed? KEY_2)     (begin
+      (level:load "floor-2.tmx")
+      ; todo: change hero
+      ; todo: change npcs
+      ))
 
 ;;    (if (key-pressed #x3d) (resize 0.9)) ;=
 ;;    (if (key-pressed #x2d) (resize 1.1)) ;-

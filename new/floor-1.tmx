@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.0" tiledversion="1.0.3" orientation="orthogonal" renderorder="right-up" width="20" height="20" tilewidth="32" tileheight="32" nextobjectid="10">
+<map version="1.0" tiledversion="1.0.3" orientation="orthogonal" renderorder="right-up" width="20" height="20" tilewidth="32" tileheight="32" nextobjectid="12">
  <tileset firstgid="1" name="interior" tilewidth="32" tileheight="32" tilecount="256" columns="16">
   <image source="media/interior.png" width="512" height="512"/>
  </tileset>
@@ -16,7 +16,7 @@
   <image source="characters/warrior_f.png" width="96" height="144"/>
  </tileset>
  <tileset firstgid="293" name="mage_f" tilewidth="32" tileheight="36" tilecount="12" columns="3">
-  <image source="../new2/characters/mage_f.png" width="96" height="144"/>
+  <image source="characters/mage_f.png" width="96" height="144"/>
  </tileset>
  <layer name="background" width="20" height="20">
   <data encoding="csv">
@@ -94,8 +94,9 @@
   <object id="1" name="hero" type="npc" gid="269" x="167" y="315" width="32" height="36"/>
   <object id="3" type="npc" gid="290" x="390.333" y="209.667" width="32" height="36"/>
   <object id="5" type="npc" gid="288" x="301" y="218.667" width="32" height="36"/>
-  <object id="7" name="sample" type="portal" x="35" y="131" width="25" height="26"/>
+  <object id="7" name="floor-2/floor-1" type="portal" x="35" y="131" width="25" height="26"/>
   <object id="8" type="portal" gid="257" x="350" y="315" width="32" height="32"/>
+  <object id="11" name="floor-2" type="spawn" x="69.5" y="147" width="25" height="26"/>
  </objectgroup>
  <objectgroup name="items" visible="0"/>
  <layer name="collision" width="20" height="20" visible="0">

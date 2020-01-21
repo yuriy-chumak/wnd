@@ -2,6 +2,7 @@
    (otus lisp)
    (file xml))
 (import (scheme misc))
+(import (file ini))
 (import (only (lang intern) string->symbol))
 
 ; public interface:
@@ -38,6 +39,186 @@
    (interact 'level ['draw creatures]))
 
 
+; =====================================================================
+; === CREATURES =======================================================
+(define orientations {
+   0 0 ; top
+   1 1 ; right
+   2 2 ; bottom
+   3 3 ; left
+}) ;left-top
+
+
+
+(define-syntax make-setter
+   (syntax-rules (name)
+      ((make-setter (function this sender . args) . body)
+         (list (quote function)
+            (lambda (this sender . args)
+               . body)
+            (lambda all
+               (mail name (cons (quote function) all)))
+            ))))
+(define-syntax make-getter
+   (syntax-rules (name)
+      ((make-getter (function this sender . args) . body)
+         (list (quote function)
+            (lambda (this sender . args)
+               . body)
+            (lambda all
+               (interact name (cons (quote function) all)))
+            ))))
+
+
+;; (define-syntax make-creature-macro
+;;    (syntax-rules (SET)
+;;       ((make-creature-macro (SET (function this sender . args) . body) . rest)
+;;          (list (quote function)
+;;             (lambda (this sender . args)
+;;                . body)
+;;             (lambda all
+;;                (interact name (list->tuple (cons (quote function) all))))
+;;             ))))
+
+; ----------------------------------
+; todo: make automatic id generation
+; создать новое "создание"
+(define (make-creature name initial)
+(let*((I (fold (lambda (ff function)
+                        (cons
+                           (put (car ff) (car function) (cadr function))
+                           (put (cdr ff) (car function) (caddr function))))
+                  (cons initial #empty)
+                  (list
+         ; debug staff
+         (make-setter (set this sender key value)
+            (put this key value))
+         (make-getter (get this sender key)
+            (mail sender (get this key #f))
+            this)
+         (make-getter (debug this sender)
+            (mail sender this)
+            this)
+
+
+         ; задать новое положение npc
+         (make-setter (set-location this sender xy)
+            (put this 'location xy))
+
+         (make-setter (set-orientation this sender orientation)
+            (put this 'orientation orientation))
+
+         (make-getter (get-location this sender)
+            (mail sender (get this 'location '(0 . 0)))
+            this)
+
+
+         ; конфигурирование анимации
+         ;  задать имя тайловой карты и конфигурационный файл анимаций персонажа
+         (make-setter (set-animation-profile this sender name ini)
+            (let*((this (put this 'fg (level:get-gid name)))
+                  (this (put this 'animations (pairs->ff (ini-parse-file ini))))
+                  (this (put this 'columns (level:get-columns name))))
+               this))
+
+         (make-getter (set-current-animation this sender animation)
+            ; set current animation (that will be changed, or not to default)
+            ; return animation cycle time (for feature use by caller)
+            (let*((this (put this 'animation animation))
+                  (this (put this 'ssms (time-ms))))
+               ; сообщим вызывающему сколько будет длиться полный цикл анимации
+               ; (так как у нас пошаговая игра, то вызывающему надо подождать пока проиграется цикл анимации)
+               (let*((animation-info (getf (get this 'animations #empty) (getf this 'animation)))
+                     (duration (getf animation-info 'duration))
+                     (duration (substring duration 0 (- (string-length duration) 2)))
+                     (duration (string->number duration 10))
+                     (frames (get animation-info 'frames "4"))
+                     (frames (string->number frames 10))
+                     (animation-type (get animation-info 'type ""))
+                     (duration (if (string-eq? animation-type "back_forth")
+                                 (floor (* (+ frames frames -1)))
+                                 duration)))
+                     ; decoded duration in ms
+                  (mail sender #|duration|#
+                     (if (string-eq? animation-type "back_forth")
+                           (* 100 (+ frames frames -1))
+                           (* 100 frames))
+                  ))
+               this))
+         ; ...
+         (make-getter (get-animation-frame this sender)
+            ; todo: change frames count according to animation type (and fix according math)
+            (let*((animation (get this 'animation 'stance)) ; соответствующая состояния анимация
+                  (ssms (- (time-ms) (get this 'ssms 0))) ; количество ms с момента перехода в анимацию
+                  (columns (get this 'columns 32))
+                  (delta (getf this 'next-location))
+                  (animations (get this 'animations #empty))
+                  (animation (get animations animation #empty))
+                  (animation-type (get animation 'type #false))
+                  (duration (get animation 'duration "250ms"))
+                  (duration (substring duration 0 (- (string-length duration) 2)))
+                  (duration (string->number duration 10))
+                  (frames (get animation 'frames "4"))
+                  (frames (string->number frames 10))
+                  (duration (if (string-eq? animation-type "back_forth")
+                              (floor (* (+ frames frames -1)))
+                              duration))
+
+                  (duration
+                     (if (string-eq? animation-type "back_forth")
+                           (* 100 (+ frames frames -1))
+                           (* 100 frames)))
+
+
+                  (position (get animation 'position "4"))
+                  (position (string->number position 10))
+                  (orientation (get this 'orientation 0))
+                  (frame (floor (/ (* ssms frames) duration)))
+
+                  (delta (if delta (let ((n (if (string-eq? animation-type "back_forth")
+                                                (+ frames frames -1)
+                                                frames)))
+                     (cons (* (min frame n) (/ (car delta) n))
+                           (* (min frame n) (/ (cdr delta) n))))))
+
+                  (frame (cond
+                     ((string-eq? animation-type "play_once")
+                        (min (- frames 1) frame))
+                     ((string-eq? animation-type "looped")
+                        (mod frame frames))
+                     ((string-eq? animation-type "back_forth")
+                        (list-ref (append (iota frames) (reverse (iota (- frames 2) 1))) (mod frame (+ frames frames -2)))))))
+               (mail sender (cons (+ (get this 'fg 0) position
+                  frame
+                  (* columns (get orientations orientation 0)))
+                  delta)))
+            this)
+      ))))
+   (print "name: " name)
+
+   (fork-server name (lambda ()
+      (print "server " name " started.")
+   (let this ((itself (car I)))
+   (let*((envelope (wait-mail))
+         (sender msg envelope))
+      (let ((handler (get itself (car msg) #false)))
+         (unless handler
+            (print "Unhandled message " msg " from " sender))
+         (this (if handler
+            (apply handler (cons itself (cons sender (cdr msg))))
+            itself)))))))
+
+   (define creature (ff-union (cdr I)
+      {'name name}
+      (lambda (a b) a)))
+
+   ;; ; добавим npc к общему списку npc
+   ;; (mail 'creatures ['set name creature])
+   creature))
+; =====================================================================
+; =====================================================================
+
+
 ; -------------------------------
 ; что касается "занятости" мира расчетами
 (setq *calculating* (box #f)) ; внутренняя переменная
@@ -45,6 +226,22 @@
    (set-car! *calculating* busy))
 (define (world-busy?)
    (car *calculating*))
+; -----------------------------------------------
+
+(fork-server 'levels (lambda ()
+   (let this ((itself #empty))
+      (let*((envelope (wait-mail))
+            (sender msg envelope))
+         (case msg
+            ; low level interaction interface
+            (['set key value]
+               (this (put itself key value)))
+            (['get key]
+               (mail sender (getf itself key))
+               (this itself))
+            (['debug]
+               (mail sender itself)
+               (this itself)))))))
 
 ; -----------------------------------------------
 ; helper functions
@@ -59,10 +256,9 @@
          (case msg
             ; low level interaction interface
             (['set key value]
-               (let ((itself (put itself key value)))
-                  (this itself)))
+               (this (put itself key value)))
             (['get key]
-               (mail sender (get itself key #false))
+               (mail sender (getf itself key))
                (this itself))
             (['debug]
                (mail sender itself)
@@ -70,163 +266,235 @@
 
             ; загрузить новую карту
             (['load filename]
-               (for-each display (list "Loading new level '" filename "'... "))
-               (define xml (xml-parse-file filename))
-               (define level (car (xml-get-value xml))) ; use <map>
-               (print "ok.")
+               (define fn (string->symbol filename))
+               (define level (or
+                  (interact 'levels ['get fn]))
+                  ; если уровень еще не был прочитан - прочитаем:
+                  (begin 
+                     (for-each display (list "Loading new level '" filename "'... "))
+                     (define xml (xml-parse-file filename))
+                     (define level (car (xml-get-value xml))) ; use <map>
+                     (print "ok.")
 
-               ; compiling tilesets:
+                     ; xml parser simplification
+                     (define (I xml attribute)
+                        (string->number (xml:attribute xml attribute #f) 10))
+                     (define (S xml attribute)
+                        (string->symbol (xml:attribute xml attribute #f)))
 
-               (define tilewidth (string->number (xml-get-attribute level 'tilewidth #f) 10)) ; ширина тайла
-               (define tileheight (string->number (xml-get-attribute level 'tileheight #f) 10)) ; высота тайла
-               (define width (string->number (xml-get-attribute level 'width #f) 10))  ; количество тайлов по горизонтали
-               (define height (string->number (xml-get-attribute level 'height #f) 10)); количество тайлов по вертикали
+                     ; compiling tilesets:
+                     (define tilewidth (I level 'tilewidth)) ; ширина тайла
+                     (define tileheight (I level 'tileheight)) ; высота тайла
+                     (define width (I level 'width))  ; количество тайлов по горизонтали
+                     (define height (I level 'height)); количество тайлов по вертикали
 
-               (define WIDTH (string->number (xml-get-attribute level 'width #f) 10))
-               (define HEIGHT (string->number (xml-get-attribute level 'height #f) 10))
+                     (define WIDTH (I level 'width))  ; количество тайлов по горизонтали
+                     (define HEIGHT (I level 'height)); количество тайлов по вертикали
 
-               (define tilesets (xml-get-subtags level 'tileset))
+                     (define tilesets (xml-get-subtags level 'tileset))
 
-               (define gids (pairs->ff (map (lambda (tileset)
-                     (cons
-                        (string->symbol (xml-get-attribute tileset 'name "noname"))
-                        (string->number (xml-get-attribute tileset 'firstgid "0") 10)))
-                  tilesets)))
-               (define columns (pairs->ff (map (lambda (tileset)
-                     (cons
-                        (string->symbol (xml-get-attribute tileset 'name "noname"))
-                        (/;(string->number (xml-get-attribute tileset 'columns "0") 10)) <- old code
-                           (string->number (xml-get-attribute (xml-get-subtag tileset 'image) 'width "64") 10)
-                           (string->number (xml-get-attribute tileset 'tilewidth "64") 10))))
-                  tilesets)))
+                     ; список начальных номеров тайлов
+                     (define gids (pairs->ff (map (lambda (tileset)
+                           (cons
+                              (S tileset 'name)
+                              (I tileset 'firstgid)))
+                        tilesets)))
+                     ; количество колонок в тайлсете (для персонажей. отдельная строка - отдельная ориентация перса)
+                     (define columns (pairs->ff (map (lambda (tileset)
+                           (cons
+                              (string->symbol (xml-get-attribute tileset 'name "noname"))
+                              (/;(string->number (xml-get-attribute tileset 'columns "0") 10)) <- old code
+                                 (I (xml-get-subtag tileset 'image) 'width)
+                                 (I tileset 'tilewidth))))
+                        tilesets)))
 
-               ; tile names:
-               (define tilenames
-                  (map
-                     (lambda (tileset)
-                        (let ((image (xml-get-subtag tileset 'image))
-                              (tileoffset (xml-get-subtag tileset 'tileoffset)))
-                           (define name (xml-get-attribute image 'source "checker.png"))
-                           (define first-gid (string->number (xml-get-attribute tileset 'firstgid "0") 10))
+                     ; тайлы: [gid ширина имя]
+                     (define tilenames
+                        (map
+                           (lambda (tileset)
+                              (let ((image (xml-get-subtag tileset 'image))
+                                    (tileoffset (xml-get-subtag tileset 'tileoffset)))
+                                 (define name (xml-get-attribute image 'source "checker.png"))
+                                 (define first-gid (I tileset 'firstgid))
+                                 (define columns (/ (I image 'width) (I tileset 'tilewidth)))
 
-                           (define image-width (string->number (xml-get-attribute image 'width "64") 10))
-                           (define tile-width (string->number (xml-get-attribute tileset 'tilewidth "64") 10))
-                           (define columns (/ image-width tile-width))
-
-                           [first-gid columns name]))
-                     tilesets))
+                                 [first-gid columns name]))
+                           tilesets))
 
 
-               ; make ff (id > tileset element)
-               (define tileset
-               (fold (lambda (a b)
-                           (ff-union a b #f))
-                  #empty
-                  (map
-                     (lambda (tileset)
-                        (let ((image (xml-get-subtag tileset 'image))
-                              (tileoffset (xml-get-subtag tileset 'tileoffset)))
-                           (define name (xml-get-attribute image 'source "checker.png"))
-                           (define id ; OpenGL texture atlas id
-                              (SOIL_load_OGL_texture (c-string name) SOIL_LOAD_RGBA SOIL_CREATE_NEW_ID 0))
-                           (define image-width (string->number (xml-get-attribute image 'width "64") 10))
-                           (define image-height (string->number (xml-get-attribute image 'height "32") 10))
+                     ; make ff (id > tileset element)
+                     (define tileset
+                     (fold (lambda (a b)
+                                 (ff-union a b #f))
+                        #empty
+                        (map
+                           (lambda (tileset)
+                              (let ((image (xml-get-subtag tileset 'image))
+                                    (tileoffset (xml-get-subtag tileset 'tileoffset)))
+                                 (define name (xml:attribute image 'source "checker.png"))
+                                 (define id ; OpenGL texture atlas id
+                                    (SOIL_load_OGL_texture (c-string name) SOIL_LOAD_RGBA SOIL_CREATE_NEW_ID 0))
+                                 (define image-width (I image 'width))
+                                 (define image-height (I image 'height))
 
-                           (define first-gid (string->number (xml-get-attribute tileset 'firstgid "0") 10))
-                           (define tile-width (string->number (xml-get-attribute tileset 'tilewidth "64") 10))
-                           (define tile-height (string->number (xml-get-attribute tileset 'tileheight "32") 10))
-                           (define tile-count (string->number (xml-get-attribute tileset 'tilecount "0") 10))
-                           (define columns (/ image-width tile-width)) ;(string->number (xml-get-attribute tileset 'columns 0) 10)) <- old
-                           (define tile-offsets (if tileoffset
-                                                   (cons
-                                                      (string->number (xml-get-attribute tileoffset 'x "0") 10)
-                                                      (string->number (xml-get-attribute tileoffset 'y "0") 10))
-                                                   '(0 . 0)))
+                                 (define first-gid (I tileset 'firstgid))
+                                 (define tile-width (I tileset 'tilewidth))
+                                 (define tile-height (I tileset 'tileheight))
+                                 (define tile-count (I tileset 'tilecount))
+                                 (define columns (/ image-width tile-width)) ;(string->number (xml-get-attribute tileset 'columns 0) 10)) <- old
 
-                           (define tiles (fold append #null
-                              (map (lambda (row)
-                                    (map (lambda (col)
-                                          (let ((ul_x (* col tile-width))
-                                                (ul_y (* row tile-height)))
-                                             [
-                                                id ; texture id
-                                                tile-width
-                                                tile-height
-                                                tile-offsets
-                                                ; texcoords:
-                                                [
-                                                   (/ ul_x image-width)
-                                                   (/ ul_y image-height)
-                                                   (/ (+ ul_x tile-width) image-width)
-                                                   (/ (+ ul_y tile-height) image-height)]]))
-                                       (iota columns)))
-                                 (iota (/ tile-count columns)))))
-                           (pairs->ff (map cons
-                                 (iota (length tiles) first-gid)
-                                 tiles))))
-                     tilesets)))
+                                 (define tile-offsets (if tileoffset
+                                                         (cons
+                                                            (I tileoffset 'x)
+                                                            (I tileoffset 'y))
+                                                         '(0 . 0)))
 
-               ; prepare layers
-               (define layers (fold (lambda (ff layer)
-                                       (define name (xml-get-attribute layer 'name #f))
-                                       (define data (xml-get-value (xml-get-subtag layer 'data)))
-                                       (put ff (string->symbol name)
-                                          (map (lambda (line)
-                                                  (map (lambda (ch) (string->number ch 10))
-                                                     (split-by-comma line)))
-                                             (split-by-newline data))))
-                                 #empty
-                                 (xml-get-subtags level 'layer)))
+                                 (define tiles (fold append #null
+                                    (map (lambda (row)
+                                          (map (lambda (col)
+                                                (let ((ul_x (* col tile-width))
+                                                      (ul_y (* row tile-height)))
+                                                   [
+                                                      id ; texture id
+                                                      tile-width
+                                                      tile-height
+                                                      tile-offsets
+                                                      ; texcoords:
+                                                      [
+                                                         (/ ul_x image-width)
+                                                         (/ ul_y image-height)
+                                                         (/ (+ ul_x tile-width) image-width)
+                                                         (/ (+ ul_y tile-height) image-height)]]))
+                                             (iota columns)))
+                                       (iota (/ tile-count columns)))))
+                                 (pairs->ff (map cons
+                                       (iota (length tiles) first-gid)
+                                       tiles))))
+                           tilesets)))
 
-               ; прочитаем из карты список npc
-               (define npcs
-                  (fold (lambda (ff objectgroup)
-                           (fold (lambda (ff object)
-                                    (define id (string->number (xml-get-attribute object 'id "0") 10))
-                                    (if (string-eq? (xml-get-attribute object 'type "") "npc")
-                                       (put ff id (ref object 2))
-                                       ff))
-                              ff
-                              (xml-get-subtags objectgroup 'object)))
-                     {}
-                     (filter
-                        (lambda (tag)
-                           (string-eq? (xml-get-attribute tag 'name "") "objects"))
-                        (xml-get-subtags level 'objectgroup))))
+                     ; слои
+                     (define layers (fold (lambda (ff layer)
+                                             (define name (xml:attribute layer 'name #f))
+                                             (define data (xml:value (xml-get-subtag layer 'data)))
+                                             (put ff (string->symbol name)
+                                                (map (lambda (line)
+                                                      (map (lambda (ch) (string->number ch 10))
+                                                         (split-by-comma line)))
+                                                   (split-by-newline data))))
+                                       #empty
+                                       (xml-get-subtags level 'layer)))
 
-               ; порталы
-               (define portals
-                  (fold (lambda (ff objectgroup)
-                           (fold (lambda (ff object)
-                                    (define id (string->number (xml-get-attribute object 'id "0") 10))
-                                    (if (string-eq? (xml-get-attribute object 'type "") "portal")
-                                       (put ff id (ref object 2))
-                                       ff))
-                              ff
-                              (xml-get-subtags objectgroup 'object)))
-                     {}
-                     (filter
-                        (lambda (tag)
-                           (string-eq? (xml-get-attribute tag 'name "") "objects"))
-                        (xml-get-subtags level 'objectgroup))))
-               (print "portals: " portals)
+                     ; npc
+                     (define npcs
+                        (ff-fold (lambda (& key value)
+                              (define npc (make-creature key #empty))
+                              ((npc 'set-location) (cons
+                                 (value 'x)
+                                 (value 'y)))
+                              ; тут надо найти какому тайлсету принадлежит этот моб
+                              (define gid (value 'gid))
+                              (call/cc (lambda (done)
+                                 (let loop ((old tilenames) (tiles tilenames))
+                                    (if (or
+                                          (null? tiles)
+                                          (< gid (ref (car tiles) 1)))
+                                       (begin
+                                          (define r (string->regex "s/^.+\\/(.+)\\..+/\\1/"))
+                                          (define name (r (ref old 3)))
+                                          
+                                          ((npc 'set-animation-profile)
+                                             (string->symbol name)
+                                             (fold string-append "" (list "animations/" name ".ini")))
+                                          
+                                          (define orientation (div (- gid (ref old 1)) (ref old 2)))
+                                          ((npc 'set-orientation) orientation)
 
+                                          (done #t))
+                                       (loop (car tiles) (cdr tiles))))))
+                              ((npc 'set-current-animation) 'default)
+                              (put & key npc))
+                           {}
+                           (fold (lambda (ff objectgroup)
+                                    (fold (lambda (ff object)
+                                             (define id (I object 'id))
+                                             (if (string-eq? (xml:attribute object 'type "") "npc")
+                                                (put ff id {
+                                                   'id  id
+                                                   'gid (I object 'gid)
+                                                   'x (/ (I object 'x) tilewidth)
+                                                   'y (/ (I object 'y) tileheight) })
+                                                ff))
+                                       ff
+                                       (xml-get-subtags objectgroup 'object)))
+                              {}
+                              (filter
+                                 (lambda (tag)
+                                    (string-eq? (xml:attribute tag 'name "") "objects"))
+                                 (xml-get-subtags level 'objectgroup)))))
+
+                     ; порталы
+                     (define portals
+                        (fold (lambda (ff objectgroup)
+                                 (fold (lambda (ff object)
+                                          (define id (I object 'id))
+                                          (if (string-eq? (xml:attribute object 'type "") "portal")
+                                             (put ff id {
+                                                'id id
+                                                'name (xml:attribute object 'name #f)
+                                                'x (/ (I object 'x) tilewidth)
+                                                'y (/ (I object 'y) tileheight)
+                                                'width  (/ (I object 'width) tilewidth)
+                                                'height (/ (I object 'height) tileheight) })
+                                             ff))
+                                    ff
+                                    (xml-get-subtags objectgroup 'object)))
+                           {}
+                           (filter
+                              (lambda (tag)
+                                 (string-eq? (xml-get-attribute tag 'name "") "objects"))
+                              (xml-get-subtags level 'objectgroup))))
+
+                     ; порталы
+                     (define spawns
+                        (fold (lambda (ff objectgroup)
+                                 (fold (lambda (ff object)
+                                          (define id (I object 'id))
+                                          (if (string-eq? (xml:attribute object 'type "") "spawn")
+                                             (put ff id {
+                                                'id id
+                                                'name (xml:attribute object 'name #f)
+                                                'x (/ (I object 'x) tilewidth)
+                                                'y (/ (I object 'y) tileheight) })
+                                             ff))
+                                    ff
+                                    (xml-get-subtags objectgroup 'object)))
+                           {}
+                           (filter
+                              (lambda (tag)
+                                 (string-eq? (xml:attribute tag 'name "") "objects"))
+                              (xml-get-subtags level 'objectgroup))))
+
+                     ; парсинг и предвычисления закончены, создадим уровень
+                     (define newlevel
+                        (fold (lambda (ff kv) (put ff (car kv) (cdr kv))) itself `(
+                           (width . ,width) (height . ,height)
+                           (tilewidth . ,tilewidth)
+                           (tileheight . ,tileheight)
+                           (gids . ,gids)
+                           (columns . ,columns)
+                           (tileset . ,tileset)
+
+                           (npcs . ,npcs)
+                           (portals . ,portals)
+                           (spawns . ,spawns)
+
+                           (tilenames . ,tilenames)
+                           (layers . ,layers))))
+                     (mail 'levels ['set fn newlevel])
+                     newlevel))
                ; ok
                (mail sender 'ok)
-               ; парсинг и предвычисления закончены, запишем нужные параметры
-               (this (fold (lambda (ff kv) (put ff (car kv) (cdr kv))) itself `(
-                  (width . ,width) (height . ,height)
-                  (tilewidth . ,tilewidth)
-                  (tileheight . ,tileheight)
-                  (gids . ,gids)
-                  (columns . ,columns)
-                  (tileset . ,tileset)
-                  (npcs . ,npcs)
-                  (portals . ,portals)
-                  (tilenames . ,tilenames)
-                  (layers . ,layers)))
-               ))
-
+               (this level))
             ; draw the level on the screen
             (['draw creatures]; interact
                (let ((w (getf itself 'tilewidth))
