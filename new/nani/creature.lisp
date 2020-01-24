@@ -1,6 +1,21 @@
 (import (file ini))
 (import (scheme misc))
 
+;; temp
+; получить слой уровня по имени
+(define (level:get-layer name)
+   (getf (interact 'level ['get 'layers]) name))
+
+; получить первый номер тайла, ассоциированный с тайлсетом name
+(define (level:get-gid name)
+   (getf (interact 'level ['get 'gids]) name))
+
+; возвращает количество тайлов в одной строке тайлсета name
+(define (level:get-columns name)
+   (getf (interact 'level ['get 'columns]) name))
+
+
+
 ;; ; поместить создание на карту
 ;; (define (creature:set-location creature location)
 ;;    (mail creature ['set-location location]))
@@ -117,176 +132,176 @@
 ;;    (6 . 1) ; left
 ;;    (7 . 2)))) ;left-top
 ;; (define speed 64) ; 1 tile per second
-;; (define orientations {
-;;    0 0 ; top
-;;    1 1 ; right
-;;    2 2 ; bottom
-;;    3 3 ; left
-;; }) ;left-top
+(define orientations {
+   0 0 ; top
+   1 1 ; right
+   2 2 ; bottom
+   3 3 ; left
+}) ;left-top
 
 
 
-;; (define-syntax make-setter
-;;    (syntax-rules (name)
-;;       ((make-setter (function this sender . args) . body)
+(define-syntax make-setter
+   (syntax-rules (name)
+      ((make-setter (function this sender . args) . body)
+         (list (quote function)
+            (lambda (this sender . args)
+               . body)
+            (lambda all
+               (mail name (cons (quote function) all)))
+            ))))
+(define-syntax make-getter
+   (syntax-rules (name)
+      ((make-getter (function this sender . args) . body)
+         (list (quote function)
+            (lambda (this sender . args)
+               . body)
+            (lambda all
+               (interact name (cons (quote function) all)))
+            ))))
+
+
+;; (define-syntax make-creature-macro
+;;    (syntax-rules (SET)
+;;       ((make-creature-macro (SET (function this sender . args) . body) . rest)
 ;;          (list (quote function)
 ;;             (lambda (this sender . args)
 ;;                . body)
 ;;             (lambda all
-;;                (mail name (cons (quote function) all)))
-;;             ))))
-;; (define-syntax make-getter
-;;    (syntax-rules (name)
-;;       ((make-getter (function this sender . args) . body)
-;;          (list (quote function)
-;;             (lambda (this sender . args)
-;;                . body)
-;;             (lambda all
-;;                (interact name (cons (quote function) all)))
+;;                (interact name (list->tuple (cons (quote function) all))))
 ;;             ))))
 
-
-;; ;; (define-syntax make-creature-macro
-;; ;;    (syntax-rules (SET)
-;; ;;       ((make-creature-macro (SET (function this sender . args) . body) . rest)
-;; ;;          (list (quote function)
-;; ;;             (lambda (this sender . args)
-;; ;;                . body)
-;; ;;             (lambda all
-;; ;;                (interact name (list->tuple (cons (quote function) all))))
-;; ;;             ))))
-
-;; ; ----------------------------------
-;; ; todo: make automatic id generation
-;; ; создать новое "создание"
-;; (define (make-creature name initial)
-;; (let*((I (fold (lambda (ff function)
-;;                         (cons
-;;                            (put (car ff) (car function) (cadr function))
-;;                            (put (cdr ff) (car function) (caddr function))))
-;;                   (cons initial #empty)
-;;                   (list
-;;          ; debug staff
-;;          (make-setter (set this sender key value)
-;;             (put this key value))
-;;          (make-getter (get this sender key)
-;;             (mail sender (get this key #f))
-;;             this)
-;;          (make-getter (debug this sender)
-;;             (mail sender this)
-;;             this)
+; ----------------------------------
+; todo: make automatic id generation
+; создать новое "создание"
+(define (make-creature name initial)
+(let*((I (fold (lambda (ff function)
+                        (cons
+                           (put (car ff) (car function) (cadr function))
+                           (put (cdr ff) (car function) (caddr function))))
+                  (cons initial #empty)
+                  (list
+         ; debug staff
+         (make-setter (set this sender key value)
+            (put this key value))
+         (make-getter (get this sender key)
+            (mail sender (get this key #f))
+            this)
+         (make-getter (debug this sender)
+            (mail sender this)
+            this)
 
 
-;;          ; задать новое положение npc
-;;          (make-setter (set-location this sender xy)
-;;             (put this 'location xy))
+         ; задать новое положение npc
+         (make-setter (set-location this sender xy)
+            (put this 'location xy))
 
-;;          (make-setter (set-orientation this sender orientation)
-;;             (put this 'orientation orientation))
+         (make-setter (set-orientation this sender orientation)
+            (put this 'orientation orientation))
 
-;;          (make-getter (get-location this sender)
-;;             (mail sender (get this 'location '(0 . 0)))
-;;             this)
-
-
-;;          ; конфигурирование анимации
-;;          ;  задать имя тайловой карты и конфигурационный файл анимаций персонажа
-;;          (make-setter (set-animation-profile this sender name ini)
-;;             (let*((this (put this 'fg (level:get-gid name)))
-;;                   (this (put this 'animations (pairs->ff (ini-parse-file ini))))
-;;                   (this (put this 'columns (level:get-columns name))))
-;;                this))
-
-;;          (make-getter (set-current-animation this sender animation)
-;;             ; set current animation (that will be changed, or not to default)
-;;             ; return animation cycle time (for feature use by caller)
-;;             (let*((this (put this 'animation animation))
-;;                   (this (put this 'ssms (time-ms))))
-;;                ; сообщим вызывающему сколько будет длиться полный цикл анимации
-;;                ; (так как у нас пошаговая игра, то вызывающему надо подождать пока проиграется цикл анимации)
-;;                (let*((animation-info (getf (get this 'animations #empty) (getf this 'animation)))
-;;                      (duration (getf animation-info 'duration))
-;;                      (duration (substring duration 0 (- (string-length duration) 2)))
-;;                      (duration (string->number duration 10))
-;;                      (frames (get animation-info 'frames "4"))
-;;                      (frames (string->number frames 10))
-;;                      (animation-type (get animation-info 'type ""))
-;;                      (duration (if (string-eq? animation-type "back_forth")
-;;                                  (floor (* (+ frames frames -1)))
-;;                                  duration)))
-;;                      ; decoded duration in ms
-;;                   (mail sender #|duration|#
-;;                      (if (string-eq? animation-type "back_forth")
-;;                            (* 100 (+ frames frames -1))
-;;                            (* 100 frames))
-;;                   ))
-;;                this))
-;;          ; ...
-;;          (make-getter (get-animation-frame this sender)
-;;             ; todo: change frames count according to animation type (and fix according math)
-;;             (let*((animation (get this 'animation 'stance)) ; соответствующая состояния анимация
-;;                   (ssms (- (time-ms) (get this 'ssms 0))) ; количество ms с момента перехода в анимацию
-;;                   (columns (get this 'columns 32))
-;;                   (delta (getf this 'next-location))
-;;                   (animations (get this 'animations #empty))
-;;                   (animation (get animations animation #empty))
-;;                   (animation-type (get animation 'type #false))
-;;                   (duration (get animation 'duration "250ms"))
-;;                   (duration (substring duration 0 (- (string-length duration) 2)))
-;;                   (duration (string->number duration 10))
-;;                   (frames (get animation 'frames "4"))
-;;                   (frames (string->number frames 10))
-;;                   (duration (if (string-eq? animation-type "back_forth")
-;;                               (floor (* (+ frames frames -1)))
-;;                               duration))
-
-;;                   (duration
-;;                      (if (string-eq? animation-type "back_forth")
-;;                            (* 100 (+ frames frames -1))
-;;                            (* 100 frames)))
+         (make-getter (get-location this sender)
+            (mail sender (get this 'location '(0 . 0)))
+            this)
 
 
-;;                   (position (get animation 'position "4"))
-;;                   (position (string->number position 10))
-;;                   (orientation (get this 'orientation 0))
-;;                   (frame (floor (/ (* ssms frames) duration)))
+         ; конфигурирование анимации
+         ;  задать имя тайловой карты и конфигурационный файл анимаций персонажа
+         (make-setter (set-animation-profile this sender name ini)
+            (let*((this (put this 'fg (level:get-gid name)))
+                  (this (put this 'animations (pairs->ff (ini-parse-file ini))))
+                  (this (put this 'columns (level:get-columns name))))
+               this))
 
-;;                   (delta (if delta (let ((n (if (string-eq? animation-type "back_forth")
-;;                                                 (+ frames frames -1)
-;;                                                 frames)))
-;;                      (cons (* (min frame n) (/ (car delta) n))
-;;                            (* (min frame n) (/ (cdr delta) n))))))
+         (make-getter (set-current-animation this sender animation)
+            ; set current animation (that will be changed, or not to default)
+            ; return animation cycle time (for feature use by caller)
+            (let*((this (put this 'animation animation))
+                  (this (put this 'ssms (time-ms))))
+               ; сообщим вызывающему сколько будет длиться полный цикл анимации
+               ; (так как у нас пошаговая игра, то вызывающему надо подождать пока проиграется цикл анимации)
+               (let*((animation-info (getf (get this 'animations #empty) (getf this 'animation)))
+                     (duration (getf animation-info 'duration))
+                     (duration (substring duration 0 (- (string-length duration) 2)))
+                     (duration (string->number duration 10))
+                     (frames (get animation-info 'frames "4"))
+                     (frames (string->number frames 10))
+                     (animation-type (get animation-info 'type ""))
+                     (duration (if (string-eq? animation-type "back_forth")
+                                 (floor (* (+ frames frames -1)))
+                                 duration)))
+                     ; decoded duration in ms
+                  (mail sender #|duration|#
+                     (if (string-eq? animation-type "back_forth")
+                           (* 100 (+ frames frames -1))
+                           (* 100 frames))
+                  ))
+               this))
+         ; ...
+         (make-getter (get-animation-frame this sender)
+            ; todo: change frames count according to animation type (and fix according math)
+            (let*((animation (get this 'animation 'stance)) ; соответствующая состояния анимация
+                  (ssms (- (time-ms) (get this 'ssms 0))) ; количество ms с момента перехода в анимацию
+                  (columns (get this 'columns 32))
+                  (delta (getf this 'next-location))
+                  (animations (get this 'animations #empty))
+                  (animation (get animations animation #empty))
+                  (animation-type (get animation 'type #false))
+                  (duration (get animation 'duration "250ms"))
+                  (duration (substring duration 0 (- (string-length duration) 2)))
+                  (duration (string->number duration 10))
+                  (frames (get animation 'frames "4"))
+                  (frames (string->number frames 10))
+                  (duration (if (string-eq? animation-type "back_forth")
+                              (floor (* (+ frames frames -1)))
+                              duration))
 
-;;                   (frame (cond
-;;                      ((string-eq? animation-type "play_once")
-;;                         (min (- frames 1) frame))
-;;                      ((string-eq? animation-type "looped")
-;;                         (mod frame frames))
-;;                      ((string-eq? animation-type "back_forth")
-;;                         (list-ref (append (iota frames) (reverse (iota (- frames 2) 1))) (mod frame (+ frames frames -2)))))))
-;;                (mail sender (cons (+ (get this 'fg 0) position
-;;                   frame
-;;                   (* columns (get orientations orientation 0)))
-;;                   delta)))
-;;             this)
-;;       ))))
+                  (duration
+                     (if (string-eq? animation-type "back_forth")
+                           (* 100 (+ frames frames -1))
+                           (* 100 frames)))
 
-;;    (fork-server name (lambda ()
-;;    (let this ((itself (car I)))
-;;    (let*((envelope (wait-mail))
-;;          (sender msg envelope))
-;;       (let ((handler (get itself (car msg) #false)))
-;;          (unless handler
-;;             (print "Unhandled message " msg " from " sender))
-;;          (this (if handler
-;;             (apply handler (cons itself (cons sender (cdr msg))))
-;;             itself)))))))
 
-;;    (define creature (ff-union (cdr I)
-;;       {'name name}
-;;       (lambda (a b) a)))
+                  (position (get animation 'position "4"))
+                  (position (string->number position 10))
+                  (orientation (get this 'orientation 0))
+                  (frame (floor (/ (* ssms frames) duration)))
 
-;;    ;; ; добавим npc к общему списку npc
-;;    ;; (mail 'creatures ['set name creature])
-;;    creature))
+                  (delta (if delta (let ((n (if (string-eq? animation-type "back_forth")
+                                                (+ frames frames -1)
+                                                frames)))
+                     (cons (* (min frame n) (/ (car delta) n))
+                           (* (min frame n) (/ (cdr delta) n))))))
+
+                  (frame (cond
+                     ((string-eq? animation-type "play_once")
+                        (min (- frames 1) frame))
+                     ((string-eq? animation-type "looped")
+                        (mod frame frames))
+                     ((string-eq? animation-type "back_forth")
+                        (list-ref (append (iota frames) (reverse (iota (- frames 2) 1))) (mod frame (+ frames frames -2)))))))
+               (mail sender (cons (+ (get this 'fg 0) position
+                  frame
+                  (* columns (get orientations orientation 0)))
+                  delta)))
+            this)
+      ))))
+
+   (fork-server name (lambda ()
+   (let this ((itself (car I)))
+   (let*((envelope (wait-mail))
+         (sender msg envelope))
+      (let ((handler (get itself (car msg) #false)))
+         (unless handler
+            (print "Unhandled message " msg " from " sender))
+         (this (if handler
+            (apply handler (cons itself (cons sender (cdr msg))))
+            itself)))))))
+
+   (define creature (ff-union (cdr I)
+      {'name name}
+      (lambda (a b) a)))
+
+   ;; ; добавим npc к общему списку npc
+   ;; (mail 'creatures ['set name creature])
+   creature))
 

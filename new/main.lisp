@@ -92,8 +92,8 @@
 
 ;; ; -=( level )=-----------------
 ;; ;     заведует игровой картой
-,load "nani/level.lisp"
 ,load "nani/creature.lisp"
+,load "nani/level.lisp"
 ;; ,load "nani/ai.lisp"
 
 ;; ;; ;;; -=( creatures )=-----------------
