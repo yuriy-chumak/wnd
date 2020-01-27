@@ -408,18 +408,18 @@
    (glEnable GL_BLEND)
 
    ; теперь попросим уровень отрисовать себя
-   ;; (define creatures
-   ;;    (map (lambda (creature)
-   ;;          (define npc (cdr creature))
-   ;;          [ ((npc 'get-location))
-   ;;            ((npc 'get-animation-frame))])
-   ;;       ; отсортируем npc снизу вверх
-   ;;       (sort (lambda (a b)
-   ;;                (< (cdr (((cdr a) 'get-location)))
-   ;;                   (cdr (((cdr b) 'get-location)))))
-   ;;             (ff->list (interact 'level ['get 'npcs])))))
+   (define creatures
+      (map (lambda (creature)
+            (define npc (cdr creature))
+            [ ((npc 'get-location))
+              ((npc 'get-animation-frame))])
+         ; отсортируем npc снизу вверх
+         (sort (lambda (a b)
+                  (< (cdr (((cdr a) 'get-location)))
+                     (cdr (((cdr b) 'get-location)))))
+               (ff->list (interact 'level ['get 'npcs])))))
 
-   (level:draw #null) ;creatures)
+   (level:draw creatures)
 
    ; окошки, консолька, etc.
    ;; (render-windows)
@@ -458,27 +458,28 @@
          (glEnd)))
 
       ; герой всегда имеет индекс 1
-      (define hero ((interact 'level ['get 'npcs]) 1))
+      (define hero ((interact 'level ['get 'npcs]) 'hero #f))
+      ;(print "hero: " hero)
       ; ----- порталы -----------------------------
-      (let*((location ((hero 'get-location)))
-            (hx (car location))
-            (hy (cdr location))
-            (portals (ff->list (interact 'level ['get 'portals]))))
-         (for-each (lambda (id portal)
-               (let ((x (portal 'x))
-                     (y (portal 'y))
-                     (width  (portal 'width))
-                     (height (portal 'height)))
-                  ; прямоугольники пересекаются?
-                  (or
-                     (< (+ hx 1) x)
-                     (< (+ hy 1) y)
-                     (> hx (+ x width))
-                     (< hy (- y height)))
-                  #f))
-            (map car portals)
-            (map cdr portals)))
-
+      ;; (let*((location ((hero 'get-location)))
+      ;;       (_ (print "location: " location))
+      ;;       (hx (car location))
+      ;;       (hy (cdr location))
+      ;;       (portals (ff->list (interact 'level ['get 'portals]))))
+      ;;    (for-each (lambda (id portal)
+      ;;          (let ((x (portal 'x))
+      ;;                (y (portal 'y))
+      ;;                (width  (portal 'width))
+      ;;                (height (portal 'height)))
+      ;;             ; прямоугольники пересекаются?
+      ;;             (or
+      ;;                (< (+ hx 1) x)
+      ;;                (< (+ hy 1) y)
+      ;;                (> hx (+ x width))
+      ;;                (< hy (- y height)))
+      ;;             #f))
+      ;;       (map car portals)
+      ;;       (map cdr portals)))
 
    ; -------------
    ; обработчик состояния клавиатуры
@@ -534,11 +535,11 @@
    (if (key-pressed? KEY_UP)    (move 0 -0.03)) ; up
    (if (key-pressed? KEY_DOWN)  (move 0 +0.03)) ; down
 
-   (if (key-pressed? KEY_2)     (begin
+   (when (key-pressed? KEY_2)
       (level:load "floor-2.tmx")
       ; todo: change hero
       ; todo: change npcs
-      ))
+      )
 
 ;;    (if (key-pressed #x3d) (resize 0.9)) ;=
 ;;    (if (key-pressed #x2d) (resize 1.1)) ;-

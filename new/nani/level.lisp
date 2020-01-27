@@ -5,6 +5,10 @@
 (import (file ini))
 (import (only (lang intern) string->symbol))
 
+; internal staff
+   (define (number->string n)
+      (list->string (render-number n null 10)))
+
 ; public interface:
 
 ; загрузить уровень
@@ -94,6 +98,9 @@
                      (define xml (xml-parse-file filename))
                      (define level (car (xml-get-value xml))) ; use <map>
                      (print "ok.")
+
+                     ; имя уровня - название файла без расширения
+                     (define name ((string->regex "s/([^.]+).*/\\1/") filename))
 
                      ; xml parser simplification
                      (define (I xml attribute)
@@ -206,8 +213,10 @@
                      ; npc
                      (define npcs
                         (ff-fold (lambda (& key value)
-                              (print "making npc: " key " / " value)
-                              (define npc (make-creature key #empty))
+                              (define coroutine (string->symbol (fold string-append
+                                 name (list "/" ((if (symbol? key) symbol->string number->string) key)))))
+                              (define npc (make-creature coroutine value))
+
                               ((npc 'set-location) (cons
                                  (value 'x)
                                  (value 'y)))
@@ -220,11 +229,14 @@
                                           (< gid (ref (car tiles) 1)))
                                        (begin
                                           (define r (string->regex "s/^.+\\/(.+)\\..+/\\1/"))
-                                          (define name (r (ref old 3)))
+                                          (define name (string->symbol (r (ref old 3))))
+
                                           
                                           ((npc 'set-animation-profile)
-                                             (string->symbol name)
-                                             (fold string-append "" (list "animations/" name ".ini")))
+                                             name
+                                             (fold string-append "" (list "animations/" (symbol->string name) ".ini"))
+                                             (gids name)
+                                             (columns name))
                                           
                                           (define orientation (div (- gid (ref old 1)) (ref old 2)))
                                           ((npc 'set-orientation) orientation)
@@ -236,14 +248,21 @@
                            {}
                            (fold (lambda (ff objectgroup)
                                     (fold (lambda (ff object)
-                                             (define id (I object 'id))
                                              (if (string-eq? (xml:attribute object 'type "") "npc")
-                                                (put ff id {
-                                                   'id  id
-                                                   'gid (I object 'gid)
-                                                   'x (/ (I object 'x) tilewidth)
-                                                   'y (/ (I object 'y) tileheight) })
-                                                ff))
+                                                (begin
+                                                   ; npc id is a name as symbol or id as integer
+                                                   (define id (or
+                                                      (string->symbol (xml:attribute object 'name #false))
+                                                      (string->number (xml:attribute object 'id 999) 10)))
+                                                   (print "npc id: " id)
+
+                                                   (put ff id {
+                                                      'id  id
+                                                      'name (xml:attribute object 'name #f)
+                                                      'gid (I object 'gid)
+                                                      'x (/ (I object 'x) tilewidth)
+                                                      'y (/ (I object 'y) tileheight) }))
+                                             else ff))
                                        ff
                                        (xml-get-subtags objectgroup 'object)))
                               {}
@@ -274,27 +293,28 @@
                                  (string-eq? (xml-get-attribute tag 'name "") "objects"))
                               (xml-get-subtags level 'objectgroup))))
 
-                     ; порталы
-                     (define spawns
-                        (fold (lambda (ff objectgroup)
-                                 (fold (lambda (ff object)
-                                          (define id (I object 'id))
-                                          (if (string-eq? (xml:attribute object 'type "") "spawn")
-                                             (put ff id {
-                                                'id id
-                                                'name (xml:attribute object 'name #f)
-                                                'x (/ (I object 'x) tilewidth)
-                                                'y (/ (I object 'y) tileheight) })
-                                             ff))
-                                    ff
-                                    (xml-get-subtags objectgroup 'object)))
-                           {}
-                           (filter
-                              (lambda (tag)
-                                 (string-eq? (xml:attribute tag 'name "") "objects"))
-                              (xml-get-subtags level 'objectgroup))))
+                     ;; ; точки куда ведут порталы
+                     ;; (define spawns
+                     ;;    (fold (lambda (ff objectgroup)
+                     ;;             (fold (lambda (ff object)
+                     ;;                      (define id (I object 'id))
+                     ;;                      (if (string-eq? (xml:attribute object 'type "") "spawn")
+                     ;;                         (put ff id {
+                     ;;                            'id id
+                     ;;                            'name (xml:attribute object 'name #f)
+                     ;;                            'x (/ (I object 'x) tilewidth)
+                     ;;                            'y (/ (I object 'y) tileheight) })
+                     ;;                         ff))
+                     ;;                ff
+                     ;;                (xml-get-subtags objectgroup 'object)))
+                     ;;       {}
+                     ;;       (filter
+                     ;;          (lambda (tag)
+                     ;;             (string-eq? (xml:attribute tag 'name "") "objects"))
+                     ;;          (xml-get-subtags level 'objectgroup))))
 
                      ; парсинг и предвычисления закончены, создадим уровень
+                     (print "+++++++")
                      (define newlevel
                         (fold (lambda (ff kv) (put ff (car kv) (cdr kv))) itself `(
                            (width . ,width) (height . ,height)
@@ -306,7 +326,7 @@
 
                            (npcs . ,npcs)
                            (portals . ,portals)
-                           (spawns . ,spawns)
+                           ;(spawns . ,spawns)
 
                            (tilenames . ,tilenames)
                            (layers . ,layers))))

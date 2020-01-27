@@ -94,7 +94,11 @@
   <object id="1" name="hero" type="npc" gid="269" x="167" y="315" width="32" height="36"/>
   <object id="3" type="npc" gid="290" x="390.333" y="209.667" width="32" height="36"/>
   <object id="5" type="npc" gid="288" x="301" y="218.667" width="32" height="36"/>
-  <object id="7" name="floor-2/floor-1" type="portal" x="35" y="131" width="25" height="26"/>
+  <object id="7" type="portal" x="35" y="131" width="25" height="26">
+   <properties>
+    <property name="Target" value="floor-2/floor-1"/>
+   </properties>
+  </object>
   <object id="8" type="portal" gid="257" x="350" y="315" width="32" height="32"/>
   <object id="11" name="floor-2" type="spawn" x="69.5" y="147" width="25" height="26"/>
  </objectgroup>
