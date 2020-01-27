@@ -535,11 +535,11 @@
    (if (key-pressed? KEY_UP)    (move 0 -0.03)) ; up
    (if (key-pressed? KEY_DOWN)  (move 0 +0.03)) ; down
 
-   (when (key-pressed? KEY_2)
-      (level:load "floor-2.tmx")
-      ; todo: change hero
-      ; todo: change npcs
-      )
+   (when (key-pressed? KEY_1) ; todo: move hero to new location
+      (level:load "floor-1.tmx"))
+
+   (when (key-pressed? KEY_2) ; todo: move hero to new location
+      (level:load "floor-2.tmx"))
 
 ;;    (if (key-pressed #x3d) (resize 0.9)) ;=
 ;;    (if (key-pressed #x2d) (resize 1.1)) ;-

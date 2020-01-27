@@ -90,10 +90,12 @@
             ; загрузить новую карту
             (['load filename]
                (define fn (string->symbol filename))
-               (define level (or
-                  (interact 'levels ['get fn]))
-                  ; если уровень еще не был прочитан - прочитаем:
-                  (begin 
+
+               (define loadedlevel (interact 'levels ['get fn]))
+               (define level
+                  (if loadedlevel loadedlevel
+                     ; если уровень еще не был прочитан - прочитаем:
+                  else (begin
                      (for-each display (list "Loading new level '" filename "'... "))
                      (define xml (xml-parse-file filename))
                      (define level (car (xml-get-value xml))) ; use <map>
@@ -331,8 +333,7 @@
                            (tilenames . ,tilenames)
                            (layers . ,layers))))
                      (mail 'levels ['set fn newlevel])
-                     newlevel))
-               ; ok
+                     newlevel)))
                (mail sender 'ok)
                (this level))
             ; draw the level on the screen
