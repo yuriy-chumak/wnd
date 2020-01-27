@@ -461,25 +461,39 @@
       (define hero ((interact 'level ['get 'npcs]) 'hero #f))
       ;(print "hero: " hero)
       ; ----- порталы -----------------------------
-      ;; (let*((location ((hero 'get-location)))
-      ;;       (_ (print "location: " location))
-      ;;       (hx (car location))
-      ;;       (hy (cdr location))
-      ;;       (portals (ff->list (interact 'level ['get 'portals]))))
-      ;;    (for-each (lambda (id portal)
-      ;;          (let ((x (portal 'x))
-      ;;                (y (portal 'y))
-      ;;                (width  (portal 'width))
-      ;;                (height (portal 'height)))
-      ;;             ; прямоугольники пересекаются?
-      ;;             (or
-      ;;                (< (+ hx 1) x)
-      ;;                (< (+ hy 1) y)
-      ;;                (> hx (+ x width))
-      ;;                (< hy (- y height)))
-      ;;             #f))
-      ;;       (map car portals)
-      ;;       (map cdr portals)))
+      (let*((location ((hero 'get-location)))
+            (hx (car location))
+            (hy (- (cdr location) 1))
+            (portals (ff->list (level:get 'portals))))
+         (for-each (lambda (portal)
+               (let ((x (portal 'x))
+                     (y (portal 'y))
+                     (width  (portal 'width))
+                     (height (portal 'height)))
+                  ; прямоугольники пересекаются?
+                  (unless (or
+                        (< (+ hx 1) x)
+                        (< (+ hy 1) y)
+                        (> hx (+ x width))
+                        (< hy (- y height)))
+                     (define target (portal 'target))
+                     (define level (car target))
+                     (define spawn (cdr target))
+
+                     (when level
+                        (level:load (string-append (symbol->string level) ".tmx"))
+
+                        ; move hero to level:
+                        (level:set 'npcs
+                           (put (level:get 'npcs) 'hero hero))
+
+                        (define spawn (getf (level:get 'spawns) (cdr target)))
+                        (print "spawn: " spawn)
+                        ((hero 'set-location) (cons (spawn 'x) (spawn 'y)))
+                        
+                        )
+                  )))
+            (map cdr portals)))
 
    ; -------------
    ; обработчик состояния клавиатуры
@@ -530,10 +544,10 @@
 
 
    ; дебаг-интерфейс, позволяющий двигать окно просмотра по всей карте:
-   (if (key-pressed? KEY_RIGHT) (move +0.05 0)) ; right
-   (if (key-pressed? KEY_LEFT)  (move -0.05 0)) ; left
-   (if (key-pressed? KEY_UP)    (move 0 -0.03)) ; up
-   (if (key-pressed? KEY_DOWN)  (move 0 +0.03)) ; down
+   (if (key-pressed? KEY_RIGHT) (move +0.051 0)) ; right
+   (if (key-pressed? KEY_LEFT)  (move -0.051 0)) ; left
+   (if (key-pressed? KEY_UP)    (move 0 -0.031)) ; up
+   (if (key-pressed? KEY_DOWN)  (move 0 +0.031)) ; down
 
    (when (key-pressed? KEY_1) ; todo: move hero to new location
       (level:load "floor-1.tmx"))

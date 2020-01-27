@@ -22,6 +22,8 @@
 ;  'tilewidth: ширина тайла в пикселях
 (define (level:get property)
    (interact 'level ['get property]))
+(define (level:set property value)
+   (mail 'level ['set property value]))
 
 ; получить слой уровня по имени
 (define (level:get-layer name)
@@ -250,20 +252,19 @@
                            {}
                            (fold (lambda (ff objectgroup)
                                     (fold (lambda (ff object)
-                                             (if (string-eq? (xml:attribute object 'type "") "npc")
-                                                (begin
-                                                   ; npc id is a name as symbol or id as integer
-                                                   (define id (or
-                                                      (string->symbol (xml:attribute object 'name #false))
-                                                      (string->number (xml:attribute object 'id 999) 10)))
-                                                   (print "npc id: " id)
+                                             (if (string-eq? (xml:attribute object 'type "") "npc") (begin
+                                                ; npc id is a name as symbol or id as integer
+                                                (define id (or
+                                                   (string->symbol (xml:attribute object 'name #false))
+                                                   (string->number (xml:attribute object 'id 999) 10)))
+                                                (print "npc id: " id)
 
-                                                   (put ff id {
-                                                      'id  id
-                                                      'name (xml:attribute object 'name #f)
-                                                      'gid (I object 'gid)
-                                                      'x (/ (I object 'x) tilewidth)
-                                                      'y (/ (I object 'y) tileheight) }))
+                                                (put ff id {
+                                                   'id  id
+                                                   'name (xml:attribute object 'name #f)
+                                                   'gid (I object 'gid)
+                                                   'x (/ (I object 'x) tilewidth)
+                                                   'y (/ (I object 'y) tileheight) }))
                                              else ff))
                                        ff
                                        (xml-get-subtags objectgroup 'object)))
@@ -277,16 +278,22 @@
                      (define portals
                         (fold (lambda (ff objectgroup)
                                  (fold (lambda (ff object)
-                                          (define id (I object 'id))
-                                          (if (string-eq? (xml:attribute object 'type "") "portal")
+                                          (if (string-eq? (xml:attribute object 'type "") "portal") (begin
+                                             (define id (I object 'id))
+
+                                             (define name (xml:attribute object 'name ""))
+                                             (define target ((string->regex "c/\\//") name))
+
                                              (put ff id {
                                                 'id id
-                                                'name (xml:attribute object 'name #f)
+                                                'target (cons
+                                                   (string->symbol (lref target 0))
+                                                   (string->symbol (lref target 1)))
                                                 'x (/ (I object 'x) tilewidth)
                                                 'y (/ (I object 'y) tileheight)
                                                 'width  (/ (I object 'width) tilewidth)
-                                                'height (/ (I object 'height) tileheight) })
-                                             ff))
+                                                'height (/ (I object 'height) tileheight) }))
+                                          else ff))
                                     ff
                                     (xml-get-subtags objectgroup 'object)))
                            {}
@@ -295,25 +302,28 @@
                                  (string-eq? (xml-get-attribute tag 'name "") "objects"))
                               (xml-get-subtags level 'objectgroup))))
 
-                     ;; ; точки куда ведут порталы
-                     ;; (define spawns
-                     ;;    (fold (lambda (ff objectgroup)
-                     ;;             (fold (lambda (ff object)
-                     ;;                      (define id (I object 'id))
-                     ;;                      (if (string-eq? (xml:attribute object 'type "") "spawn")
-                     ;;                         (put ff id {
-                     ;;                            'id id
-                     ;;                            'name (xml:attribute object 'name #f)
-                     ;;                            'x (/ (I object 'x) tilewidth)
-                     ;;                            'y (/ (I object 'y) tileheight) })
-                     ;;                         ff))
-                     ;;                ff
-                     ;;                (xml-get-subtags objectgroup 'object)))
-                     ;;       {}
-                     ;;       (filter
-                     ;;          (lambda (tag)
-                     ;;             (string-eq? (xml:attribute tag 'name "") "objects"))
-                     ;;          (xml-get-subtags level 'objectgroup))))
+                     ; точки куда ведут порталы
+                     (define spawns
+                        (fold (lambda (ff objectgroup)
+                                 (fold (lambda (ff object)
+                                          (if (string-eq? (xml:attribute object 'type "") "spawn") (begin
+                                             (define id (or
+                                                (string->symbol (xml:attribute object 'name #false))
+                                                (string->number (xml:attribute object 'id 999) 10)))
+                                             (print "spawn id: " id)
+                                             
+                                             (put ff id {
+                                                'id id
+                                                'x (/ (I object 'x) tilewidth)
+                                                'y (/ (I object 'y) tileheight) }))
+                                          else ff))
+                                    ff
+                                    (xml-get-subtags objectgroup 'object)))
+                           {}
+                           (filter
+                              (lambda (tag)
+                                 (string-eq? (xml:attribute tag 'name "") "objects"))
+                              (xml-get-subtags level 'objectgroup))))
 
                      ; парсинг и предвычисления закончены, создадим уровень
                      (print "+++++++")
@@ -328,7 +338,7 @@
 
                            (npcs . ,npcs)
                            (portals . ,portals)
-                           ;(spawns . ,spawns)
+                           (spawns . ,spawns)
 
                            (tilenames . ,tilenames)
                            (layers . ,layers))))
