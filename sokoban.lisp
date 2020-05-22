@@ -264,7 +264,7 @@
          (print "gid: " gid)
          (if (= hero-id (cdr gid))
             (return (car gid))))
-         (reverse (ff->list (interact 'level (vector 'get 'gids))))))))
+         (reverse (ff->alist (interact 'level (vector 'get 'gids))))))))
 (print "hero-name: " hero-name)
 
 ;; (for-each (lambda (layer)
