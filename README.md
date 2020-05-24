@@ -10,11 +10,12 @@ REQUIREMENTS
 RUNNING
 ===
 
-`sokoban.lisp 001` or other existing level number.
+`sokoban.lisp 001.tmx` or other existing level number.
 
 Game goal: put all "exhausted" braziers to the grids (that makes a brazier to burn again).
 
-Type `q` to stop the game. Mouse scroll or `=`/`-` to change image scale. Keyboard arrows to move a map.
+Type `q` to stop the game. Type 'z' to undo last move(s).
+Mouse scroll or `=`/`-` to change image scale. Keyboard arrows to move a map.
 
 Green mouse cursor allows a hero to move by one block and push the brazier forward. Yellow mouse cursor simply allows to go to the selected place.
 
